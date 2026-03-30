@@ -27,9 +27,13 @@ const STEP_NUMBER: Record<Step, number> = {
   result: 5,
 }
 
+// 步骤切换防抖间隔（ms）
+const STEP_DEBOUNCE = 100
+
 export function App() {
   const { exit } = useApp()
-  const [step, setStep] = useState<Step>('checking')
+  const [step, setStepRaw] = useState<Step>('checking')
+  const [inputReady, setInputReady] = useState(true)
   const [remote, setRemote] = useState('')
   const [branch, setBranch] = useState('')
   const [selectedHashes, setSelectedHashes] = useState<string[]>([])
@@ -40,6 +44,18 @@ export function App() {
   const [guardTimestamp, setGuardTimestamp] = useState<string | undefined>()
   const stashedRef = useRef(false)
   const stashRestoredRef = useRef(false)
+  const mountedRef = useRef(true)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 步骤切换保护：防止快速按键导致事件泄漏到新组件
+  const setStep = useCallback((newStep: Step) => {
+    setInputReady(false)
+    setStepRaw(newStep)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      if (mountedRef.current) setInputReady(true)
+    }, STEP_DEBOUNCE)
+  }, [])
 
   // 同步恢复 stash + 清除 guard（用于信号处理，必须同步执行）
   const restoreStashSync = useCallback(() => {
@@ -66,9 +82,12 @@ export function App() {
 
   // 启动时检查 guard 文件 → 工作区状态
   useEffect(() => {
+    mountedRef.current = true
+
     async function check() {
       // 优先检查是否有上次中断的 stash guard
       const guard = await git.checkStashGuard()
+      if (!mountedRef.current) return
       if (guard.exists) {
         setGuardTimestamp(guard.timestamp)
         setStep('stash-recovery')
@@ -77,48 +96,31 @@ export function App() {
 
       // 正常流程：检查工作区
       const clean = await git.isWorkingDirClean()
+      if (!mountedRef.current) return
       setStep(clean ? 'remote' : 'stash-prompt')
     }
     check()
 
-    // 注册信号处理：Ctrl+C、终端关闭、异常等
+    // 注册信号处理：仅处理明确的终止信号
+    // uncaughtException/unhandledRejection 不注册 — 会干扰 Ink/React 内部错误处理
+    // exit 事件不注册 — execSync 在 exit 中不可靠
     const onSignal = () => {
       restoreStashSync()
       process.exit(0)
     }
 
-    const onExit = () => {
-      restoreStashSync()
-    }
-
-    const onUncaught = (err: Error) => {
-      restoreStashSync()
-      process.stderr.write(`\n❌ 未捕获异常: ${err.message}\n`)
-      process.exit(1)
-    }
-
-    const onUnhandledRejection = (reason: unknown) => {
-      restoreStashSync()
-      process.stderr.write(`\n❌ 未处理的 Promise rejection: ${reason}\n`)
-      process.exit(1)
-    }
-
     process.on('SIGINT', onSignal)
     process.on('SIGTERM', onSignal)
     process.on('SIGHUP', onSignal)
-    process.on('exit', onExit)
-    process.on('uncaughtException', onUncaught)
-    process.on('unhandledRejection', onUnhandledRejection)
 
     return () => {
+      mountedRef.current = false
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
       process.off('SIGINT', onSignal)
       process.off('SIGTERM', onSignal)
       process.off('SIGHUP', onSignal)
-      process.off('exit', onExit)
-      process.off('uncaughtException', onUncaught)
-      process.off('unhandledRejection', onUnhandledRejection)
     }
-  }, [restoreStashSync])
+  }, [restoreStashSync, setStep])
 
   // 执行 stash + 写入 guard
   const doStash = async () => {
@@ -128,7 +130,7 @@ export function App() {
       stashedRef.current = true
       await git.writeStashGuard()
     }
-    setStep('remote')
+    if (mountedRef.current) setStep('remote')
   }
 
   // stash recovery: 恢复上次中断的 stash
@@ -138,16 +140,17 @@ export function App() {
       await git.stashPop()
     }
     await git.removeStashGuard()
-    // 恢复后重新检查工作区
+    if (!mountedRef.current) return
     const clean = await git.isWorkingDirClean()
-    setStep(clean ? 'remote' : 'stash-prompt')
+    if (mountedRef.current) setStep(clean ? 'remote' : 'stash-prompt')
   }
 
   // stash recovery: 跳过恢复，清除 guard
   const skipStashRecover = async () => {
     await git.removeStashGuard()
+    if (!mountedRef.current) return
     const clean = await git.isWorkingDirClean()
-    setStep(clean ? 'remote' : 'stash-prompt')
+    if (mountedRef.current) setStep(clean ? 'remote' : 'stash-prompt')
   }
 
   return (
@@ -158,7 +161,7 @@ export function App() {
         <Spinner label="检查工作区状态..." />
       )}
 
-      {step === 'stash-recovery' && (
+      {step === 'stash-recovery' && inputReady && (
         <StashRecovery
           timestamp={guardTimestamp}
           onRecover={doStashRecover}
@@ -166,14 +169,14 @@ export function App() {
         />
       )}
 
-      {step === 'stash-prompt' && (
+      {step === 'stash-prompt' && inputReady && (
         <StashPrompt
           onConfirm={doStash}
           onSkip={() => setStep('remote')}
         />
       )}
 
-      {step === 'remote' && (
+      {step === 'remote' && inputReady && (
         <RemoteSelect
           onSelect={(r) => {
             setRemote(r)
@@ -182,7 +185,7 @@ export function App() {
         />
       )}
 
-      {step === 'branch' && (
+      {step === 'branch' && inputReady && (
         <BranchSelect
           remote={remote}
           onSelect={(b) => {
@@ -192,7 +195,7 @@ export function App() {
         />
       )}
 
-      {step === 'commits' && (
+      {step === 'commits' && inputReady && (
         <CommitList
           remote={remote}
           branch={branch}
@@ -206,7 +209,7 @@ export function App() {
         />
       )}
 
-      {step === 'confirm' && (
+      {step === 'confirm' && inputReady && (
         <ConfirmPanel
           commits={commits}
           selectedHashes={selectedHashes}
