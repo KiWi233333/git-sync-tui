@@ -30,12 +30,25 @@ const STEP_NUMBER: Record<Step, number> = {
 // 步骤切换防抖间隔（ms）
 const STEP_DEBOUNCE = 100
 
-export function App() {
+interface AppProps {
+  initialRemote?: string
+  initialBranch?: string
+}
+
+export function App({ initialRemote, initialBranch }: AppProps) {
   const { exit } = useApp()
+
+  // 根据初始参数确定起始步骤
+  const entryStep: Step = initialRemote && initialBranch
+    ? 'commits'
+    : initialRemote
+      ? 'branch'
+      : 'remote'
+
   const [step, setStepRaw] = useState<Step>('checking')
   const [inputReady, setInputReady] = useState(true)
-  const [remote, setRemote] = useState('')
-  const [branch, setBranch] = useState('')
+  const [remote, setRemote] = useState(initialRemote || '')
+  const [branch, setBranch] = useState(initialBranch || '')
   const [selectedHashes, setSelectedHashes] = useState<string[]>([])
   const [commits, setCommits] = useState<CommitInfo[]>([])
   const [hasMerge, setHasMerge] = useState(false)
@@ -97,13 +110,11 @@ export function App() {
       // 正常流程：检查工作区
       const clean = await git.isWorkingDirClean()
       if (!mountedRef.current) return
-      setStep(clean ? 'remote' : 'stash-prompt')
+      setStep(clean ? entryStep : 'stash-prompt')
     }
     check()
 
     // 注册信号处理：仅处理明确的终止信号
-    // uncaughtException/unhandledRejection 不注册 — 会干扰 Ink/React 内部错误处理
-    // exit 事件不注册 — execSync 在 exit 中不可靠
     const onSignal = () => {
       restoreStashSync()
       process.exit(0)
@@ -130,7 +141,7 @@ export function App() {
       stashedRef.current = true
       await git.writeStashGuard()
     }
-    if (mountedRef.current) setStep('remote')
+    if (mountedRef.current) setStep(entryStep)
   }
 
   // stash recovery: 恢复上次中断的 stash
@@ -142,7 +153,7 @@ export function App() {
     await git.removeStashGuard()
     if (!mountedRef.current) return
     const clean = await git.isWorkingDirClean()
-    if (mountedRef.current) setStep(clean ? 'remote' : 'stash-prompt')
+    if (mountedRef.current) setStep(clean ? entryStep : 'stash-prompt')
   }
 
   // stash recovery: 跳过恢复，清除 guard
@@ -150,7 +161,7 @@ export function App() {
     await git.removeStashGuard()
     if (!mountedRef.current) return
     const clean = await git.isWorkingDirClean()
-    if (mountedRef.current) setStep(clean ? 'remote' : 'stash-prompt')
+    if (mountedRef.current) setStep(clean ? entryStep : 'stash-prompt')
   }
 
   // ESC 返回上一步
@@ -189,7 +200,7 @@ export function App() {
       {step === 'stash-prompt' && inputReady && (
         <StashPrompt
           onConfirm={doStash}
-          onSkip={() => setStep('remote')}
+          onSkip={() => setStep(entryStep)}
         />
       )}
 
