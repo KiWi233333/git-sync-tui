@@ -3,8 +3,17 @@
   "type": "module",
   "version": "0.1.0",
   "description": "Interactive TUI tool for cross-repo git commit synchronization (cherry-pick --no-commit)",
+  "author": "KiWi233333",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KiWi233333/git-sync-tui.git"
+  },
+  "homepage": "https://github.com/KiWi233333/git-sync-tui#readme",
+  "bugs": {
+    "url": "https://github.com/KiWi233333/git-sync-tui/issues"
+  },
   "bin": {
-    "git-sync-tui": "./dist/cli.js"
+    "git-sync-tui": "dist/cli.js"
   },
   "files": [
     "dist"
@@ -24,7 +33,9 @@
     "cherry-pick",
     "tui",
     "cli",
-    "ink"
+    "ink",
+    "interactive",
+    "no-commit"
   ],
   "license": "MIT",
   "dependencies": {
