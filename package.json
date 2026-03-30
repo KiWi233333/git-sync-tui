@@ -12,6 +12,10 @@
   "bugs": {
     "url": "https://github.com/KiWi233333/git-sync-tui/issues"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
   "bin": {
     "git-sync-tui": "dist/cli.js"
   },
