@@ -17,10 +17,13 @@ const cli = meow(
     使用 cherry-pick --no-commit 模式，同步后可审查再提交。
 
   快捷键
-    Space     选择/取消 commit
-    Enter     确认选择
-    ↑/↓       导航
-    y/n       确认/取消执行
+    Space       选择/取消 commit
+    Shift+↑/↓   连续选择
+    a           全选/取消全选
+    i           反选
+    r           选至开头
+    Enter       确认选择
+    y/n         确认/取消执行
 `,
   {
     importMeta: import.meta,
