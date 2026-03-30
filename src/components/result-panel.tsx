@@ -1,0 +1,85 @@
+import React, { useState, useEffect } from 'react'
+import { Box, Text } from 'ink'
+import { Spinner } from '@inkjs/ui'
+import * as git from '../utils/git.js'
+import type { CherryPickResult } from '../utils/git.js'
+
+interface Props {
+  selectedHashes: string[]
+  onDone: () => void
+}
+
+export function ResultPanel({ selectedHashes, onDone }: Props) {
+  const [phase, setPhase] = useState<'executing' | 'done' | 'error'>('executing')
+  const [result, setResult] = useState<CherryPickResult | null>(null)
+  const [stagedStat, setStagedStat] = useState('')
+
+  useEffect(() => {
+    async function run() {
+      const res = await git.cherryPick(selectedHashes)
+      setResult(res)
+
+      if (res.success) {
+        const stat = await git.getStagedStat()
+        setStagedStat(stat)
+        setPhase('done')
+      } else {
+        setPhase('error')
+      }
+    }
+    run()
+  }, [])
+
+  if (phase === 'executing') {
+    return (
+      <Box>
+        <Spinner label={`正在执行 cherry-pick --no-commit (${selectedHashes.length} 个 commit)...`} />
+      </Box>
+    )
+  }
+
+  if (phase === 'error' && result) {
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Text bold color="red">
+          [5/5] Cherry-pick 遇到冲突
+        </Text>
+        {result.conflictFiles && result.conflictFiles.length > 0 && (
+          <Box flexDirection="column" borderStyle="single" borderColor="red" paddingX={1}>
+            <Text bold>冲突文件:</Text>
+            {result.conflictFiles.map((f) => (
+              <Text key={f} color="red">  {f}</Text>
+            ))}
+          </Box>
+        )}
+        <Text color="yellow">
+          请手动解决冲突后执行 git add 和 git commit
+        </Text>
+        <Text color="gray" dimColor>
+          或执行 git cherry-pick --abort 放弃操作
+        </Text>
+      </Box>
+    )
+  }
+
+  return (
+    <Box flexDirection="column" gap={1}>
+      <Text bold color="green">
+        [5/5] 同步完成!
+      </Text>
+
+      <Box flexDirection="column" borderStyle="round" borderColor="green" paddingX={1}>
+        <Text bold>暂存区变更概览 (git diff --cached --stat):</Text>
+        <Text color="gray">{stagedStat || '(无变更)'}</Text>
+      </Box>
+
+      <Text color="yellow">
+        改动已暂存到工作区 (--no-commit 模式)
+      </Text>
+      <Text>请审查后手动执行:</Text>
+      <Text color="cyan">  git diff --cached          # 查看详细 diff</Text>
+      <Text color="cyan">  git commit -m "同步 commit" # 提交</Text>
+      <Text color="cyan">  git reset HEAD             # 或放弃所有改动</Text>
+    </Box>
+  )
+}

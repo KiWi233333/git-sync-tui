@@ -1,0 +1,44 @@
+{
+  "name": "git-sync-tui",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Interactive TUI tool for cross-repo git commit synchronization (cherry-pick --no-commit)",
+  "bin": {
+    "git-sync-tui": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/cli.tsx",
+    "dev": "tsx watch src/cli.tsx",
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "git",
+    "sync",
+    "cherry-pick",
+    "tui",
+    "cli",
+    "ink"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@inkjs/ui": "^2.0.0",
+    "ink": "^5.1.0",
+    "meow": "^13.0.0",
+    "react": "^18.3.1",
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^18.3.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
