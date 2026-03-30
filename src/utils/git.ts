@@ -263,3 +263,14 @@ export async function resetStaged(): Promise<void> {
   const git = getGit()
   await git.raw(['reset', 'HEAD'])
 }
+
+/** 获取工作区状态 */
+export async function getWorkingDirStatus(): Promise<{ isClean: boolean; hasStaged: boolean; hasUnstaged: boolean }> {
+  const git = getGit()
+  const status = await git.status()
+  return {
+    isClean: status.isClean(),
+    hasStaged: status.staged.length > 0,
+    hasUnstaged: status.modified.length > 0 || status.not_added.length > 0,
+  }
+}

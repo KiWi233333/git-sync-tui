@@ -8,14 +8,25 @@ interface Props {
   selectedHashes: string[]
   useMainline: boolean
   stashed: boolean
+  onStashRestored: () => void
   onDone: () => void
 }
 
-export function ResultPanel({ selectedHashes, useMainline, stashed, onDone }: Props) {
+export function ResultPanel({ selectedHashes, useMainline, stashed, onStashRestored, onDone }: Props) {
   const [phase, setPhase] = useState<'executing' | 'restoring' | 'done' | 'error'>('executing')
   const [result, setResult] = useState<CherryPickResult | null>(null)
   const [stagedStat, setStagedStat] = useState('')
   const [stashRestored, setStashRestored] = useState<boolean | null>(null)
+
+  // 恢复 stash 的统一逻辑
+  const tryRestoreStash = async () => {
+    if (!stashed) return true
+    setPhase('restoring')
+    const ok = await git.stashPop()
+    setStashRestored(ok)
+    if (ok) onStashRestored()
+    return ok
+  }
 
   useEffect(() => {
     async function run() {
@@ -25,19 +36,10 @@ export function ResultPanel({ selectedHashes, useMainline, stashed, onDone }: Pr
       if (res.success) {
         const stat = await git.getStagedStat()
         setStagedStat(stat)
-
-        if (stashed) {
-          setPhase('restoring')
-          const ok = await git.stashPop()
-          setStashRestored(ok)
-        }
-
+        await tryRestoreStash()
         setPhase('done')
       } else {
-        if (stashed) {
-          const ok = await git.stashPop()
-          setStashRestored(ok)
-        }
+        await tryRestoreStash()
         setPhase('error')
       }
     }
@@ -82,6 +84,9 @@ export function ResultPanel({ selectedHashes, useMainline, stashed, onDone }: Pr
         </Text>
         {stashed && stashRestored === false && (
           <Text color="yellow">注意: stash 恢复失败，请手动 git stash pop</Text>
+        )}
+        {stashed && stashRestored === true && (
+          <Text color="green">已恢复工作区变更 (stash pop)</Text>
         )}
       </Box>
     )

@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { Box, Text } from 'ink'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Box, Text, useApp } from 'ink'
+import { Spinner } from '@inkjs/ui'
+import { StashPrompt } from './components/stash-prompt.js'
 import { RemoteSelect } from './components/remote-select.js'
 import { BranchSelect } from './components/branch-select.js'
 import { CommitList } from './components/commit-list.js'
@@ -7,11 +9,13 @@ import { ConfirmPanel } from './components/confirm-panel.js'
 import { ResultPanel } from './components/result-panel.js'
 import * as git from './utils/git.js'
 import type { CommitInfo } from './utils/git.js'
+import { execSync } from 'child_process'
 
-type Step = 'remote' | 'branch' | 'commits' | 'confirm' | 'result'
+type Step = 'checking' | 'stash-prompt' | 'remote' | 'branch' | 'commits' | 'confirm' | 'result'
 
 export function App() {
-  const [step, setStep] = useState<Step>('remote')
+  const { exit } = useApp()
+  const [step, setStep] = useState<Step>('checking')
   const [remote, setRemote] = useState('')
   const [branch, setBranch] = useState('')
   const [selectedHashes, setSelectedHashes] = useState<string[]>([])
@@ -19,15 +23,66 @@ export function App() {
   const [hasMerge, setHasMerge] = useState(false)
   const [useMainline, setUseMainline] = useState(false)
   const [stashed, setStashed] = useState(false)
+  const stashedRef = useRef(false)
+  const stashRestoredRef = useRef(false)
 
-  // 启动时自动 stash
+  // 同步恢复 stash（用于信号处理，必须同步执行）
+  const restoreStashSync = useCallback(() => {
+    if (stashedRef.current && !stashRestoredRef.current) {
+      try {
+        execSync('git stash pop', { stdio: 'ignore' })
+        stashRestoredRef.current = true
+      } catch {
+        try {
+          process.stderr.write('\n⚠ stash 自动恢复失败，请手动执行: git stash pop\n')
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [])
+
+  // 标记 stash 已被正常恢复（由 ResultPanel 调用）
+  const markStashRestored = useCallback(() => {
+    stashRestoredRef.current = true
+  }, [])
+
+  // 启动时检查工作区状态
   useEffect(() => {
     git.isWorkingDirClean().then((clean) => {
-      if (!clean) {
-        git.stash().then((ok) => ok && setStashed(true))
+      if (clean) {
+        setStep('remote')
+      } else {
+        setStep('stash-prompt')
       }
     })
-  }, [])
+
+    // 注册信号处理：Ctrl+C、终端关闭等
+    const onSignal = () => {
+      restoreStashSync()
+      process.exit(0)
+    }
+
+    process.on('SIGINT', onSignal)
+    process.on('SIGTERM', onSignal)
+    process.on('beforeExit', restoreStashSync)
+
+    return () => {
+      process.off('SIGINT', onSignal)
+      process.off('SIGTERM', onSignal)
+      process.off('beforeExit', restoreStashSync)
+    }
+  }, [restoreStashSync])
+
+  // 执行 stash
+  const doStash = async () => {
+    const ok = await git.stash()
+    if (ok) {
+      setStashed(true)
+      stashedRef.current = true
+    }
+    setStep('remote')
+  }
 
   return (
     <Box flexDirection="column">
@@ -37,6 +92,17 @@ export function App() {
         <Text color="gray">交互式 commit 同步工具 (cherry-pick --no-commit)</Text>
         {stashed && <Text color="yellow"> (已自动 stash)</Text>}
       </Box>
+
+      {step === 'checking' && (
+        <Spinner label="检查工作区状态..." />
+      )}
+
+      {step === 'stash-prompt' && (
+        <StashPrompt
+          onConfirm={doStash}
+          onSkip={() => setStep('remote')}
+        />
+      )}
 
       {step === 'remote' && (
         <RemoteSelect
@@ -88,7 +154,11 @@ export function App() {
           selectedHashes={selectedHashes}
           useMainline={useMainline}
           stashed={stashed}
-          onDone={() => process.exit(0)}
+          onStashRestored={markStashRestored}
+          onDone={() => {
+            restoreStashSync()
+            exit()
+          }}
         />
       )}
     </Box>
