@@ -31,7 +31,7 @@
   },
   "scripts": {
     "start": "tsx src/cli.tsx",
-    "dev": "tsx watch src/cli.tsx",
+    "dev": "tsx src/cli.tsx",
     "build": "tsup",
     "prepublishOnly": "pnpm run build",
     "release": "pnpm run release:patch",
