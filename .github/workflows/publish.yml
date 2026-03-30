@@ -32,9 +32,8 @@ jobs:
           pnpm pack --dry-run 2>&1 || true
           node dist/cli.js --help
 
-      - run: pnpm publish --provenance --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted Publishing (OIDC) — 无需 NPM_TOKEN，provenance 自动附加
+      - run: npm publish --access public
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
