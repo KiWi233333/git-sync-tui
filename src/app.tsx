@@ -153,6 +153,23 @@ export function App() {
     if (mountedRef.current) setStep(clean ? 'remote' : 'stash-prompt')
   }
 
+  // ESC 返回上一步
+  const goBack = useCallback((fromStep: Step) => {
+    const backMap: Partial<Record<Step, Step>> = {
+      branch: 'remote',
+      commits: 'branch',
+      confirm: 'commits',
+    }
+    const prev = backMap[fromStep]
+    if (prev) {
+      setStep(prev)
+    } else {
+      // 第一步按 ESC 退出应用
+      restoreStashSync()
+      exit()
+    }
+  }, [setStep, restoreStashSync, exit])
+
   return (
     <Box flexDirection="column">
       <AppHeader step={STEP_NUMBER[step]} stashed={stashed} />
@@ -182,6 +199,7 @@ export function App() {
             setRemote(r)
             setStep('branch')
           }}
+          onBack={() => goBack('remote')}
         />
       )}
 
@@ -192,6 +210,7 @@ export function App() {
             setBranch(b)
             setStep('commits')
           }}
+          onBack={() => goBack('branch')}
         />
       )}
 
@@ -206,6 +225,7 @@ export function App() {
             setHasMerge(merge)
             setStep('confirm')
           }}
+          onBack={() => goBack('commits')}
         />
       )}
 
@@ -217,7 +237,7 @@ export function App() {
           useMainline={useMainline}
           onToggleMainline={() => setUseMainline((v) => !v)}
           onConfirm={() => setStep('result')}
-          onCancel={() => setStep('commits')}
+          onCancel={() => goBack('confirm')}
         />
       )}
 

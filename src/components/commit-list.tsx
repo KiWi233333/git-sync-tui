@@ -9,9 +9,10 @@ interface Props {
   remote: string
   branch: string
   onSelect: (hashes: string[], commits: CommitInfo[]) => void
+  onBack?: () => void
 }
 
-export function CommitList({ remote, branch, onSelect }: Props) {
+export function CommitList({ remote, branch, onSelect, onBack }: Props) {
   const { data: commits, loading, error } = useCommits(remote, branch, 30)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [selectedHashes, setSelectedHashes] = useState<Set<string>>(new Set())
@@ -126,6 +127,8 @@ export function CommitList({ remote, branch, onSelect }: Props) {
       invertSelection()
     } else if (input === 'r' || input === 'R') {
       selectToCurrent()
+    } else if (key.escape) {
+      onBack?.()
     } else if (key.return) {
       if (selectedHashes.size > 0) {
         onSelect(Array.from(selectedHashes), commits)
@@ -204,6 +207,7 @@ export function CommitList({ remote, branch, onSelect }: Props) {
         { key: 'r', label: '选至开头' },
         { key: 'Shift+↑↓', label: '连选' },
         { key: 'Enter', label: '确认' },
+        { key: 'Esc', label: '返回' },
       ]} />
 
       {/* Stat preview */}

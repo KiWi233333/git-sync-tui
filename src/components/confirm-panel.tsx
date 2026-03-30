@@ -14,8 +14,10 @@ interface Props {
 }
 
 export function ConfirmPanel({ commits, selectedHashes, hasMerge, useMainline, onToggleMainline, onConfirm, onCancel }: Props) {
-  useInput((input) => {
-    if (input === 'y' || input === 'Y') {
+  useInput((input, key) => {
+    if (key.escape) {
+      onCancel()
+    } else if (input === 'y' || input === 'Y') {
       onConfirm()
     } else if (input === 'n' || input === 'N' || input === 'q') {
       onCancel()
@@ -69,6 +71,7 @@ export function ConfirmPanel({ commits, selectedHashes, hasMerge, useMainline, o
           { key: 'y', label: '确认' },
           { key: 'n', label: '取消' },
           ...(hasMerge ? [{ key: 'm', label: '切换 -m 1' }] : []),
+          { key: 'Esc', label: '返回' },
         ]} />
       </Box>
     </Box>

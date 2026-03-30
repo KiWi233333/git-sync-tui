@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Box, Text } from 'ink'
+import { Box, Text, useInput } from 'ink'
 import { Select, Spinner, TextInput } from '@inkjs/ui'
 import { useRemotes } from '../hooks/use-git.js'
 import { SectionHeader, KeyHints } from './ui.js'
@@ -7,15 +7,36 @@ import * as git from '../utils/git.js'
 
 interface Props {
   onSelect: (remote: string) => void
+  onBack?: () => void
 }
 
 type Phase = 'list' | 'input-url' | 'input-name' | 'adding'
 
-export function RemoteSelect({ onSelect }: Props) {
+/** 从 URL 或路径中提取默认远程名称 */
+function extractRemoteName(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, '').replace(/\.git$/, '')
+  // 取最后一段：支持 / 和 \ 分隔符，也支持 git@host:user/repo 格式
+  const lastSegment = trimmed.split(/[/\\:]+/).filter(Boolean).pop() || ''
+  return lastSegment
+}
+
+export function RemoteSelect({ onSelect, onBack }: Props) {
   const { data: remotes, loading, error, reload } = useRemotes()
   const [phase, setPhase] = useState<Phase>('list')
   const [customUrl, setCustomUrl] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
+
+  useInput((_input, key) => {
+    if (key.escape) {
+      if (phase === 'input-name') {
+        setPhase('input-url')
+      } else if (phase === 'input-url') {
+        setPhase('list')
+      } else if (phase === 'list') {
+        onBack?.()
+      }
+    }
+  })
 
   if (loading) {
     return <Spinner label="获取远程仓库..." />
@@ -54,6 +75,7 @@ export function RemoteSelect({ onSelect }: Props) {
   }
 
   if (phase === 'input-name') {
+    const defaultName = extractRemoteName(customUrl)
     return (
       <Box flexDirection="column" gap={1}>
         <SectionHeader title="添加远程仓库" subtitle={customUrl} />
@@ -61,7 +83,8 @@ export function RemoteSelect({ onSelect }: Props) {
         <Box>
           <Text color="gray">名称 ▸ </Text>
           <TextInput
-            placeholder="upstream"
+            placeholder={defaultName || 'upstream'}
+            defaultValue={defaultName}
             onSubmit={async (name) => {
               const remoteName = name.trim()
               if (!remoteName) {

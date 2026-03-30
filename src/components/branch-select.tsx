@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Box, Text } from 'ink'
+import { Box, Text, useInput } from 'ink'
 import { Select, Spinner, TextInput } from '@inkjs/ui'
 import { useBranches } from '../hooks/use-git.js'
 import { SectionHeader } from './ui.js'
@@ -7,11 +7,16 @@ import { SectionHeader } from './ui.js'
 interface Props {
   remote: string
   onSelect: (branch: string) => void
+  onBack?: () => void
 }
 
-export function BranchSelect({ remote, onSelect }: Props) {
+export function BranchSelect({ remote, onSelect, onBack }: Props) {
   const { data: branches, loading, error } = useBranches(remote)
   const [filter, setFilter] = useState('')
+
+  useInput((_input, key) => {
+    if (key.escape) onBack?.()
+  })
 
   const filteredOptions = useMemo(() => {
     if (!branches) return []
