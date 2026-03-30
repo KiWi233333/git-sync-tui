@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Box, Text } from 'ink'
 import { Select, Spinner, TextInput } from '@inkjs/ui'
 import { useRemotes } from '../hooks/use-git.js'
+import { SectionHeader, KeyHints } from './ui.js'
 import * as git from '../utils/git.js'
 
 interface Props {
@@ -17,34 +18,24 @@ export function RemoteSelect({ onSelect }: Props) {
   const [addError, setAddError] = useState<string | null>(null)
 
   if (loading) {
-    return (
-      <Box>
-        <Spinner label="正在获取远程仓库列表..." />
-      </Box>
-    )
+    return <Spinner label="获取远程仓库..." />
   }
 
   if (error) {
-    return <Text color="red">获取远程仓库失败: {error}</Text>
+    return <Text color="red">✖ 获取远程仓库失败: {error}</Text>
   }
 
-  // 添加中
   if (phase === 'adding') {
-    return (
-      <Box>
-        <Spinner label="正在添加远程仓库..." />
-      </Box>
-    )
+    return <Spinner label="添加远程仓库..." />
   }
 
-  // 输入仓库地址
   if (phase === 'input-url') {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text bold color="cyan">[1/5] 添加远程仓库</Text>
-        {addError && <Text color="red">{addError}</Text>}
+        <SectionHeader title="添加远程仓库" />
+        {addError && <Text color="red">✖ {addError}</Text>}
         <Box>
-          <Text>仓库地址: </Text>
+          <Text color="gray">URL ▸ </Text>
           <TextInput
             placeholder="https://github.com/user/repo.git"
             onSubmit={(url) => {
@@ -57,20 +48,18 @@ export function RemoteSelect({ onSelect }: Props) {
             }}
           />
         </Box>
-        <Text color="gray" dimColor>支持 HTTPS / SSH 地址</Text>
+        <Text color="gray" dimColor>  支持 HTTPS / SSH 地址</Text>
       </Box>
     )
   }
 
-  // 输入远程名
   if (phase === 'input-name') {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text bold color="cyan">[1/5] 添加远程仓库</Text>
-        <Text color="gray">地址: {customUrl}</Text>
-        {addError && <Text color="red">{addError}</Text>}
+        <SectionHeader title="添加远程仓库" subtitle={customUrl} />
+        {addError && <Text color="red">✖ {addError}</Text>}
         <Box>
-          <Text>远程名称: </Text>
+          <Text color="gray">名称 ▸ </Text>
           <TextInput
             placeholder="upstream"
             onSubmit={async (name) => {
@@ -79,7 +68,6 @@ export function RemoteSelect({ onSelect }: Props) {
                 setAddError('名称不能为空')
                 return
               }
-              // 检查重名
               if (remotes?.some((r) => r.name === remoteName)) {
                 setAddError(`远程 "${remoteName}" 已存在`)
                 return
@@ -101,7 +89,6 @@ export function RemoteSelect({ onSelect }: Props) {
     )
   }
 
-  // 列表选择
   const options = [
     ...(remotes || []).map((r) => ({
       label: `${r.name}  ${r.fetchUrl}`,
@@ -115,9 +102,7 @@ export function RemoteSelect({ onSelect }: Props) {
 
   return (
     <Box flexDirection="column" gap={1}>
-      <Text bold color="cyan">
-        [1/5] 选择远程仓库
-      </Text>
+      <SectionHeader title="选择远程仓库" />
       <Select
         options={options}
         onChange={(value) => {

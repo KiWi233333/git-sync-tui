@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Box, Text } from 'ink'
 import { Spinner } from '@inkjs/ui'
+import { SectionHeader, StatusPanel } from './ui.js'
 import * as git from '../utils/git.js'
 import type { CherryPickResult } from '../utils/git.js'
 
@@ -18,7 +19,6 @@ export function ResultPanel({ selectedHashes, useMainline, stashed, onStashResto
   const [stagedStat, setStagedStat] = useState('')
   const [stashRestored, setStashRestored] = useState<boolean | null>(null)
 
-  // 恢复 stash 的统一逻辑
   const tryRestoreStash = async () => {
     if (!stashed) return true
     setPhase('restoring')
@@ -47,46 +47,36 @@ export function ResultPanel({ selectedHashes, useMainline, stashed, onStashResto
   }, [])
 
   if (phase === 'executing') {
-    return (
-      <Box>
-        <Spinner label={`正在执行 cherry-pick --no-commit (${selectedHashes.length} 个 commit)...`} />
-      </Box>
-    )
+    return <Spinner label={`cherry-pick --no-commit (${selectedHashes.length} 个 commit)...`} />
   }
 
   if (phase === 'restoring') {
-    return (
-      <Box>
-        <Spinner label="正在恢复工作区 (git stash pop)..." />
-      </Box>
-    )
+    return <Spinner label="恢复工作区 (git stash pop)..." />
   }
 
   if (phase === 'error' && result) {
     return (
       <Box flexDirection="column" gap={1}>
-        <Text bold color="red">
-          [5/5] Cherry-pick 遇到冲突
-        </Text>
+        <SectionHeader title="Cherry-pick 遇到冲突" />
+
         {result.conflictFiles && result.conflictFiles.length > 0 && (
-          <Box flexDirection="column" borderStyle="single" borderColor="red" paddingX={1}>
-            <Text bold>冲突文件:</Text>
+          <StatusPanel type="error" title="冲突文件">
             {result.conflictFiles.map((f) => (
               <Text key={f} color="red">  {f}</Text>
             ))}
-          </Box>
+          </StatusPanel>
         )}
-        <Text color="yellow">
-          请手动解决冲突后执行 git add 和 git commit
-        </Text>
-        <Text color="gray" dimColor>
-          或执行 git cherry-pick --abort 放弃操作
-        </Text>
+
+        <Box flexDirection="column">
+          <Text color="yellow">▸ 手动解决冲突后执行 git add 和 git commit</Text>
+          <Text color="gray" dimColor>▸ 或执行 git cherry-pick --abort 放弃操作</Text>
+        </Box>
+
         {stashed && stashRestored === false && (
-          <Text color="yellow">注意: stash 恢复失败，请手动 git stash pop</Text>
+          <Text color="yellow">▲ stash 恢复失败，请手动 git stash pop</Text>
         )}
         {stashed && stashRestored === true && (
-          <Text color="green">已恢复工作区变更 (stash pop)</Text>
+          <Text color="green">✔ 已恢复工作区变更 (stash pop)</Text>
         )}
       </Box>
     )
@@ -94,30 +84,27 @@ export function ResultPanel({ selectedHashes, useMainline, stashed, onStashResto
 
   return (
     <Box flexDirection="column" gap={1}>
-      <Text bold color="green">
-        [5/5] 同步完成!
-      </Text>
+      <SectionHeader title="同步完成" />
 
-      <Box flexDirection="column" borderStyle="round" borderColor="green" paddingX={1}>
-        <Text bold>暂存区变更概览 (git diff --cached --stat):</Text>
+      <StatusPanel type="success" title="暂存区变更 (git diff --cached --stat)">
         <Text color="gray">{stagedStat || '(无变更)'}</Text>
-      </Box>
+      </StatusPanel>
 
       {stashed && (
         stashRestored ? (
-          <Text color="green">已恢复工作区变更 (stash pop)</Text>
+          <Text color="green">✔ 已恢复工作区变更 (stash pop)</Text>
         ) : (
-          <Text color="yellow">stash pop 失败，请手动 git stash pop</Text>
+          <Text color="yellow">▲ stash pop 失败，请手动 git stash pop</Text>
         )
       )}
 
-      <Text color="yellow">
-        改动已暂存到工作区 (--no-commit 模式)
-      </Text>
-      <Text>请审查后手动执行:</Text>
-      <Text color="cyan">  git diff --cached          # 查看详细 diff</Text>
-      <Text color="cyan">  git commit -m "同步 commit" # 提交</Text>
-      <Text color="cyan">  git reset HEAD             # 或放弃所有改动</Text>
+      <Box flexDirection="column">
+        <Text color="yellow">▲ 改动已暂存到工作区 (--no-commit 模式)</Text>
+        <Text color="gray" dimColor>  审查后手动执行:</Text>
+        <Text color="cyan">  git diff --cached          <Text color="gray" dimColor># 查看详细 diff</Text></Text>
+        <Text color="cyan">  git commit -m "sync: ..."  <Text color="gray" dimColor># 提交</Text></Text>
+        <Text color="cyan">  git reset HEAD             <Text color="gray" dimColor># 或放弃</Text></Text>
+      </Box>
     </Box>
   )
 }

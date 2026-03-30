@@ -1,5 +1,6 @@
 import React from 'react'
 import { Box, Text, useInput } from 'ink'
+import { StatusPanel, InlineKeys } from './ui.js'
 
 interface Props {
   onConfirm: () => void
@@ -17,16 +18,15 @@ export function StashPrompt({ onConfirm, onSkip }: Props) {
 
   return (
     <Box flexDirection="column" gap={1}>
-      <Box borderStyle="single" borderColor="yellow" paddingX={1} flexDirection="column">
-        <Text bold color="yellow">检测到工作区有未提交的变更</Text>
-        <Text color="gray">Cherry-pick 操作可能会与未提交的内容冲突</Text>
-      </Box>
+      <StatusPanel type="warn" title="工作区有未提交的变更">
+        <Text color="gray">  Cherry-pick 操作可能会与未提交的内容冲突</Text>
+      </StatusPanel>
       <Box>
-        <Text bold>是否自动 stash 保存当前变更? </Text>
-        <Text color="green">[y]</Text>
-        <Text> 是 / </Text>
-        <Text color="red">[n]</Text>
-        <Text> 否，继续操作</Text>
+        <Text bold>自动 stash 保存当前变更? </Text>
+        <InlineKeys hints={[
+          { key: 'y', label: '是' },
+          { key: 'n', label: '否，继续' },
+        ]} />
       </Box>
     </Box>
   )

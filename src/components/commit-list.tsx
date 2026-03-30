@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react'
 import { Box, Text, useInput } from 'ink'
 import { Spinner } from '@inkjs/ui'
 import { useCommits, useCommitStat } from '../hooks/use-git.js'
+import { SectionHeader, KeyHints, Divider, StatusPanel } from './ui.js'
 import type { CommitInfo } from '../utils/git.js'
 
 interface Props {
@@ -15,14 +16,12 @@ export function CommitList({ remote, branch, onSelect }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [selectedHashes, setSelectedHashes] = useState<Set<string>>(new Set())
   const [shiftMode, setShiftMode] = useState(false)
-  const anchorIndexRef = useRef<number | null>(null) // shift 选择的锚点
+  const anchorIndexRef = useRef<number | null>(null)
 
-  // 用稳定的 key 避免 Set 引用变化导致频繁重渲染
   const selectedKey = useMemo(() => Array.from(selectedHashes).sort().join(','), [selectedHashes])
   const selectedArray = useMemo(() => Array.from(selectedHashes), [selectedKey])
   const { stat, loading: statLoading } = useCommitStat(selectedArray)
 
-  // 切换当前项选择状态
   const toggleCurrent = () => {
     if (!commits || commits.length === 0) return
     const hash = commits[selectedIndex].hash
@@ -39,7 +38,6 @@ export function CommitList({ remote, branch, onSelect }: Props) {
     })
   }
 
-  // 选择范围（从锚点到当前索引）
   const selectRange = (anchor: number, current: number) => {
     if (!commits) return
     const start = Math.min(anchor, current)
@@ -53,7 +51,6 @@ export function CommitList({ remote, branch, onSelect }: Props) {
     })
   }
 
-  // 全选/取消全选
   const toggleAll = () => {
     if (!commits || commits.length === 0) return
     setSelectedHashes((prev) => {
@@ -65,21 +62,17 @@ export function CommitList({ remote, branch, onSelect }: Props) {
     })
   }
 
-  // 反选
   const invertSelection = () => {
     if (!commits || commits.length === 0) return
     setSelectedHashes((prev) => {
       const next = new Set<string>()
       for (const c of commits) {
-        if (!prev.has(c.hash)) {
-          next.add(c.hash)
-        }
+        if (!prev.has(c.hash)) next.add(c.hash)
       }
       return next
     })
   }
 
-  // 选择从第一项到当前项
   const selectToCurrent = () => {
     if (!commits || commits.length === 0) return
     setSelectedHashes((prev) => {
@@ -94,16 +87,13 @@ export function CommitList({ remote, branch, onSelect }: Props) {
   useInput((input, key) => {
     if (!commits || commits.length === 0) return
 
-    // shift 组合键处理
     if (key.shift) {
       if (!shiftMode) {
         setShiftMode(true)
-        // 设置锚点
         if (anchorIndexRef.current === null) {
           anchorIndexRef.current = selectedIndex
         }
       }
-
       if (key.upArrow) {
         const newIndex = Math.max(0, selectedIndex - 1)
         setSelectedIndex(newIndex)
@@ -113,7 +103,6 @@ export function CommitList({ remote, branch, onSelect }: Props) {
         setSelectedIndex(newIndex)
         selectRange(anchorIndexRef.current!, newIndex)
       } else if (input === ' ') {
-        // Shift+Space: 选择从锚点到当前
         if (anchorIndexRef.current !== null) {
           selectRange(anchorIndexRef.current, selectedIndex)
         } else {
@@ -123,10 +112,7 @@ export function CommitList({ remote, branch, onSelect }: Props) {
       return
     }
 
-    // 退出 shift 模式
-    if (shiftMode) {
-      setShiftMode(false)
-    }
+    if (shiftMode) setShiftMode(false)
 
     if (key.upArrow) {
       setSelectedIndex((prev) => Math.max(0, prev - 1))
@@ -148,40 +134,42 @@ export function CommitList({ remote, branch, onSelect }: Props) {
   })
 
   if (loading) {
-    return (
-      <Box>
-        <Spinner label={`正在获取 ${remote}/${branch} 的 commit 列表...`} />
-      </Box>
-    )
+    return <Spinner label={`获取 ${remote}/${branch} 的 commit 列表...`} />
   }
 
   if (error) {
-    return <Text color="red">获取 commit 列表失败: {error}</Text>
+    return <Text color="red">✖ 获取 commit 列表失败: {error}</Text>
   }
 
   if (!commits || commits.length === 0) {
-    return <Text color="yellow">该分支没有 commit</Text>
+    return <Text color="yellow">▲ 该分支没有 commit</Text>
   }
 
-  // 计算显示范围
   const visibleCount = 10
   const startIdx = Math.max(0, Math.min(selectedIndex - Math.floor(visibleCount / 2), commits.length - visibleCount))
   const visibleCommits = commits.slice(startIdx, startIdx + visibleCount)
 
   return (
     <Box flexDirection="column" gap={1}>
-      <Text bold color="cyan">
-        [3/5] 选择要同步的 commit
-      </Text>
-      <Text color="gray" dimColor>
-        {remote}/{branch} 最近 {commits.length} 个 commit | 已选 {selectedHashes.size} 个
-        {shiftMode && <Text color="yellow"> | Shift 模式</Text>}
-      </Text>
+      <SectionHeader title="选择要同步的 commit" />
 
-      {/* commit 列表 */}
+      <Box gap={2}>
+        <Text color="gray" dimColor>
+          {remote}/{branch}
+        </Text>
+        <Text color="gray" dimColor>
+          {commits.length} commits
+        </Text>
+        <Text color={selectedHashes.size > 0 ? 'cyan' : 'gray'} bold={selectedHashes.size > 0}>
+          已选 {selectedHashes.size}
+        </Text>
+        {shiftMode && <Text color="yellow" bold>SHIFT</Text>}
+      </Box>
+
+      {/* Commit list */}
       <Box flexDirection="column">
         {startIdx > 0 && (
-          <Text color="gray" dimColor>  ↑ {startIdx} more...</Text>
+          <Text color="gray" dimColor>  ↑ {startIdx} more</Text>
         )}
         {visibleCommits.map((c, i) => {
           const actualIdx = startIdx + i
@@ -190,49 +178,43 @@ export function CommitList({ remote, branch, onSelect }: Props) {
           const isAnchor = actualIdx === anchorIndexRef.current
 
           return (
-            <Text key={c.hash}>
+            <Box key={c.hash}>
               <Text backgroundColor={isCursor ? 'blue' : undefined} color={isSelected ? 'green' : 'white'}>
-                {isCursor ? '▶ ' : '  '}
-                {isAnchor ? '⚓ ' : isSelected ? '● ' : '○ '}
-                {c.shortHash} {c.message}
+                {isCursor ? '▸ ' : '  '}
+                {isAnchor ? '⚓' : isSelected ? '●' : '○'}
+                {' '}
               </Text>
-              <Text color="gray" dimColor> ({c.author})</Text>
-            </Text>
+              <Text backgroundColor={isCursor ? 'blue' : undefined} color="yellow">{c.shortHash}</Text>
+              <Text backgroundColor={isCursor ? 'blue' : undefined} color={isSelected ? 'green' : 'white'}> {c.message}</Text>
+              <Text color="gray" dimColor> {c.author} · {c.date}</Text>
+            </Box>
           )
         })}
         {startIdx + visibleCount < commits.length && (
-          <Text color="gray" dimColor>  ↓ {commits.length - startIdx - visibleCount} more...</Text>
+          <Text color="gray" dimColor>  ↓ {commits.length - startIdx - visibleCount} more</Text>
         )}
       </Box>
 
-      {/* 快捷键提示 */}
-      <Box flexDirection="column" gap={0}>
-        <Box gap={2}>
-          <Text><Text color="cyan">↑/↓</Text> 导航</Text>
-          <Text><Text color="cyan">Space</Text> 选择</Text>
-          <Text><Text color="cyan">a</Text> 全选</Text>
-          <Text><Text color="cyan">i</Text> 反选</Text>
-          <Text><Text color="cyan">Enter</Text> 确认</Text>
-        </Box>
-        <Box gap={2}>
-          <Text><Text color="yellow">Shift+↑/↓</Text> 连续选择</Text>
-          <Text><Text color="yellow">Shift+Space</Text> 范围选择</Text>
-          <Text><Text color="cyan">r</Text> 选至开头</Text>
-        </Box>
-      </Box>
+      {/* Key hints */}
+      <KeyHints hints={[
+        { key: '↑↓', label: '导航' },
+        { key: 'Space', label: '选择' },
+        { key: 'a', label: '全选' },
+        { key: 'i', label: '反选' },
+        { key: 'r', label: '选至开头' },
+        { key: 'Shift+↑↓', label: '连选' },
+        { key: 'Enter', label: '确认' },
+      ]} />
 
-      {/* 预览 */}
+      {/* Stat preview */}
       {selectedHashes.size > 0 && (
-        <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1}>
-          <Text bold color="yellow">
-            已选 {selectedHashes.size} 个 commit — diff --stat 预览:
-          </Text>
+        <StatusPanel type="info" title={`已选 ${selectedHashes.size} 个 commit · diff --stat`}>
           {statLoading ? (
             <Spinner label="加载中..." />
           ) : (
             <Text color="gray">{stat || '(无变更)'}</Text>
           )}
-        </Box>
+        </StatusPanel>
       )}
     </Box>
   )
