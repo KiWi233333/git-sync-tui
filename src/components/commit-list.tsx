@@ -17,7 +17,9 @@ export function CommitList({ remote, branch, onSelect }: Props) {
   const [shiftMode, setShiftMode] = useState(false)
   const anchorIndexRef = useRef<number | null>(null) // shift 选择的锚点
 
-  const selectedArray = useMemo(() => Array.from(selectedHashes), [selectedHashes])
+  // 用稳定的 key 避免 Set 引用变化导致频繁重渲染
+  const selectedKey = useMemo(() => Array.from(selectedHashes).sort().join(','), [selectedHashes])
+  const selectedArray = useMemo(() => Array.from(selectedHashes), [selectedKey])
   const { stat, loading: statLoading } = useCommitStat(selectedArray)
 
   // 切换当前项选择状态
