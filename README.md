@@ -1,68 +1,115 @@
 # git-sync-tui
 
-Interactive TUI tool for cross-repo git commit synchronization.
+[![npm version](https://img.shields.io/npm/v/git-sync-tui.svg)](https://www.npmjs.com/package/git-sync-tui)
+[![Node.js Version](https://img.shields.io/node/v/git-sync-tui.svg)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Cherry-pick commits from remote branches with an interactive terminal UI — select specific commits, preview changes, and sync with `--no-commit` mode for review before committing.
+> Interactive TUI tool for cross-repository git commit synchronization
+
+Cherry-pick commits from remote branches with an intuitive terminal UI. Select specific commits, preview changes, and sync with `--no-commit` mode for safe review before committing.
+
+[中文文档](./README.zh-CN.md)
 
 ## Features
 
-- **Multi-select commits** — pick non-consecutive commits with Space/Enter
-- **`--no-commit` mode** — changes are staged, not committed, so you can review and edit before committing
-- **Diff preview** — see `--stat` summary of selected commits before executing
-- **Branch search** — filter branches by keyword
-- **Conflict handling** — shows conflicted files when cherry-pick fails
-- **Language agnostic** — works in any git repo (Node.js, Go, Python, Java, etc.)
+- 🎯 **Multi-select commits** — Pick non-consecutive commits with Space/Enter
+- 🔍 **Branch search** — Filter branches by keyword
+- 👀 **Diff preview** — See `--stat` summary of selected commits before executing
+- ⚡ **`--no-commit` mode** — Changes are staged, not committed, for safe review
+- ⚠️ **Conflict handling** — Shows conflicted files when cherry-pick fails
+- 🌐 **Language agnostic** — Works in any git repository
 
-## Install
+## Installation
 
 ```bash
 npm install -g git-sync-tui
 ```
 
-Requires Node.js >= 20.
+**Requirements:** Node.js >= 20
 
-## Usage
+## Quick Start
 
 ```bash
-# Run in any git repository
+# Navigate to your git repository
+cd your-project
+
+# Run the tool
 git-sync-tui
 ```
 
-### Workflow
+## Workflow
 
 ```
-[Select remote] → [Select branch] → [Multi-select commits] → [Preview stat] → [Confirm] → [Cherry-pick --no-commit] → [Review & commit manually]
+┌─────────────┐    ┌──────────────┐    ┌─────────────────┐    ┌───────────┐
+│ Select      │ -> │ Select       │ -> │ Multi-select    │ -> │ Preview   │
+│ Remote      │    │ Branch       │    │ Commits         │    │ Changes   │
+└─────────────┘    └──────────────┘    └─────────────────┘    └───────────┘
+                                                                   │
+                                                                   v
+┌─────────────────┐    ┌───────────────────────────────────────────────┐
+│ Review &        │ <- │ Cherry-pick --no-commit (staged, not committed) │
+│ Commit manually │    └───────────────────────────────────────────────┘
+└─────────────────┘
 ```
 
 ### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| `↑` / `↓` | Navigate |
+| `↑` / `↓` | Navigate items |
 | `Space` | Toggle commit selection |
 | `Enter` | Confirm selection |
 | `y` / `n` | Confirm / cancel execution |
+| `/` | Search (in branch list) |
 
-### After sync
+### After Sync
 
 Changes are staged in your working tree (not committed). You can:
 
 ```bash
-git diff --cached          # Review changes
-git commit -m "sync: ..."  # Commit when ready
-git reset HEAD             # Or discard all changes
+# Review staged changes
+git diff --cached
+
+# Commit when ready
+git commit -m "sync: cherry-picked commits from feature-branch"
+
+# Or discard all changes
+git reset HEAD
 ```
+
+## Use Cases
+
+- **Backport bug fixes** — Cherry-pick critical fixes from main to release branches
+- **Sync feature commits** — Copy commits between feature branches
+- **Selective merge** — Pick specific commits instead of merging entire branches
 
 ## Development
 
 ```bash
+# Clone the repository
 git clone https://github.com/KiWi233333/git-sync-tui.git
 cd git-sync-tui
+
+# Install dependencies
 npm install
-npm start        # Run with tsx
-npm run build    # Build with tsup
+
+# Run in development mode
+npm start
+
+# Build for production
+npm run build
 ```
+
+## Tech Stack
+
+- [Ink](https://github.com/vadimdemedes/ink) — React for interactive CLI apps
+- [@inkjs/ui](https://github.com/inkjs/ui) — UI components for Ink
+- [simple-git](https://github.com/steveukx/git-js) — Git commands interface
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT
+[MIT](./LICENSE) © [KiWi233333](https://github.com/KiWi233333)
