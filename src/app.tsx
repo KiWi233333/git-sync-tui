@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Box, Text } from 'ink'
 import { RemoteSelect } from './components/remote-select.js'
 import { BranchSelect } from './components/branch-select.js'
 import { CommitList } from './components/commit-list.js'
 import { ConfirmPanel } from './components/confirm-panel.js'
 import { ResultPanel } from './components/result-panel.js'
+import * as git from './utils/git.js'
 import type { CommitInfo } from './utils/git.js'
 
 type Step = 'remote' | 'branch' | 'commits' | 'confirm' | 'result'
@@ -15,6 +16,18 @@ export function App() {
   const [branch, setBranch] = useState('')
   const [selectedHashes, setSelectedHashes] = useState<string[]>([])
   const [commits, setCommits] = useState<CommitInfo[]>([])
+  const [hasMerge, setHasMerge] = useState(false)
+  const [useMainline, setUseMainline] = useState(false)
+  const [stashed, setStashed] = useState(false)
+
+  // 启动时自动 stash
+  useEffect(() => {
+    git.isWorkingDirClean().then((clean) => {
+      if (!clean) {
+        git.stash().then((ok) => ok && setStashed(true))
+      }
+    })
+  }, [])
 
   return (
     <Box flexDirection="column">
@@ -22,6 +35,7 @@ export function App() {
         <Text bold inverse color="white"> git-sync-tui </Text>
         <Text> </Text>
         <Text color="gray">交互式 commit 同步工具 (cherry-pick --no-commit)</Text>
+        {stashed && <Text color="yellow"> (已自动 stash)</Text>}
       </Box>
 
       {step === 'remote' && (
@@ -47,9 +61,11 @@ export function App() {
         <CommitList
           remote={remote}
           branch={branch}
-          onSelect={(hashes, loadedCommits) => {
+          onSelect={async (hashes, loadedCommits) => {
             setSelectedHashes(hashes)
             setCommits(loadedCommits)
+            const merge = await git.hasMergeCommits(hashes)
+            setHasMerge(merge)
             setStep('confirm')
           }}
         />
@@ -59,6 +75,9 @@ export function App() {
         <ConfirmPanel
           commits={commits}
           selectedHashes={selectedHashes}
+          hasMerge={hasMerge}
+          useMainline={useMainline}
+          onToggleMainline={() => setUseMainline((v) => !v)}
           onConfirm={() => setStep('result')}
           onCancel={() => setStep('commits')}
         />
@@ -67,6 +86,8 @@ export function App() {
       {step === 'result' && (
         <ResultPanel
           selectedHashes={selectedHashes}
+          useMainline={useMainline}
+          stashed={stashed}
           onDone={() => process.exit(0)}
         />
       )}

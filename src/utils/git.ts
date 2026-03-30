@@ -38,6 +38,12 @@ export async function getRemotes(): Promise<RemoteInfo[]> {
   }))
 }
 
+/** 添加远程仓库 */
+export async function addRemote(name: string, url: string): Promise<void> {
+  const git = getGit()
+  await git.addRemote(name, url)
+}
+
 /** 获取远程分支列表 */
 export async function getRemoteBranches(remote: string): Promise<string[]> {
   const git = getGit()
@@ -157,14 +163,33 @@ export async function getMultiCommitStat(hashes: string[]): Promise<string> {
   }
 }
 
+/** 检查选中的 commits 中是否有 merge commits */
+export async function hasMergeCommits(hashes: string[]): Promise<boolean> {
+  const git = getGit()
+  try {
+    for (const hash of hashes) {
+      const result = await git.raw(['rev-list', '--merges', '-n', '1', hash])
+      if (result.trim()) return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 /** 执行 cherry-pick --no-commit */
-export async function cherryPick(hashes: string[]): Promise<CherryPickResult> {
+export async function cherryPick(hashes: string[], useMainline = false): Promise<CherryPickResult> {
   const git = getGit()
   try {
     // 逐个 cherry-pick --no-commit，保持顺序（从旧到新）
     const orderedHashes = [...hashes].reverse()
     for (const hash of orderedHashes) {
-      await git.raw(['cherry-pick', '--no-commit', hash])
+      const args = ['cherry-pick', '--no-commit']
+      if (useMainline) {
+        args.push('-m', '1')
+      }
+      args.push(hash)
+      await git.raw(args)
     }
     return { success: true }
   } catch (err: any) {

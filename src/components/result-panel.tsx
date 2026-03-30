@@ -6,24 +6,38 @@ import type { CherryPickResult } from '../utils/git.js'
 
 interface Props {
   selectedHashes: string[]
+  useMainline: boolean
+  stashed: boolean
   onDone: () => void
 }
 
-export function ResultPanel({ selectedHashes, onDone }: Props) {
-  const [phase, setPhase] = useState<'executing' | 'done' | 'error'>('executing')
+export function ResultPanel({ selectedHashes, useMainline, stashed, onDone }: Props) {
+  const [phase, setPhase] = useState<'executing' | 'restoring' | 'done' | 'error'>('executing')
   const [result, setResult] = useState<CherryPickResult | null>(null)
   const [stagedStat, setStagedStat] = useState('')
+  const [stashRestored, setStashRestored] = useState<boolean | null>(null)
 
   useEffect(() => {
     async function run() {
-      const res = await git.cherryPick(selectedHashes)
+      const res = await git.cherryPick(selectedHashes, useMainline)
       setResult(res)
 
       if (res.success) {
         const stat = await git.getStagedStat()
         setStagedStat(stat)
+
+        if (stashed) {
+          setPhase('restoring')
+          const ok = await git.stashPop()
+          setStashRestored(ok)
+        }
+
         setPhase('done')
       } else {
+        if (stashed) {
+          const ok = await git.stashPop()
+          setStashRestored(ok)
+        }
         setPhase('error')
       }
     }
@@ -34,6 +48,14 @@ export function ResultPanel({ selectedHashes, onDone }: Props) {
     return (
       <Box>
         <Spinner label={`正在执行 cherry-pick --no-commit (${selectedHashes.length} 个 commit)...`} />
+      </Box>
+    )
+  }
+
+  if (phase === 'restoring') {
+    return (
+      <Box>
+        <Spinner label="正在恢复工作区 (git stash pop)..." />
       </Box>
     )
   }
@@ -58,6 +80,9 @@ export function ResultPanel({ selectedHashes, onDone }: Props) {
         <Text color="gray" dimColor>
           或执行 git cherry-pick --abort 放弃操作
         </Text>
+        {stashed && stashRestored === false && (
+          <Text color="yellow">注意: stash 恢复失败，请手动 git stash pop</Text>
+        )}
       </Box>
     )
   }
@@ -72,6 +97,14 @@ export function ResultPanel({ selectedHashes, onDone }: Props) {
         <Text bold>暂存区变更概览 (git diff --cached --stat):</Text>
         <Text color="gray">{stagedStat || '(无变更)'}</Text>
       </Box>
+
+      {stashed && (
+        stashRestored ? (
+          <Text color="green">已恢复工作区变更 (stash pop)</Text>
+        ) : (
+          <Text color="yellow">stash pop 失败，请手动 git stash pop</Text>
+        )
+      )}
 
       <Text color="yellow">
         改动已暂存到工作区 (--no-commit 模式)
