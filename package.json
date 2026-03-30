@@ -1,7 +1,7 @@
 {
   "name": "git-sync-tui",
   "type": "module",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "packageManager": "pnpm@10.32.1",
   "description": "Interactive TUI tool for cross-repo git commit synchronization (cherry-pick --no-commit)",
   "author": "KiWi233333",
