@@ -1,4 +1,6 @@
 import simpleGit, { type SimpleGit } from 'simple-git'
+import { existsSync, writeFileSync, unlinkSync, readFileSync } from 'fs'
+import { join } from 'path'
 
 export interface CommitInfo {
   hash: string
@@ -262,6 +264,97 @@ export async function abortCherryPick(): Promise<void> {
 export async function resetStaged(): Promise<void> {
   const git = getGit()
   await git.raw(['reset', 'HEAD'])
+}
+
+// ===== Stash Guard =====
+
+const STASH_GUARD_FILE = 'git-sync-tui-stash-guard'
+
+/** 获取 .git 目录路径 */
+async function getGitDir(): Promise<string> {
+  const git = getGit()
+  const dir = await git.revparse(['--git-dir'])
+  return dir.trim()
+}
+
+/** 写入 stash guard 标记文件 */
+export async function writeStashGuard(): Promise<void> {
+  try {
+    const gitDir = await getGitDir()
+    writeFileSync(join(gitDir, STASH_GUARD_FILE), new Date().toISOString(), 'utf-8')
+  } catch {
+    // 写入失败不阻塞主流程
+  }
+}
+
+/** 同步写入 stash guard（用于信号处理） */
+export function writeStashGuardSync(): void {
+  try {
+    const { execSync } = require('child_process')
+    const gitDir = String(execSync('git rev-parse --git-dir', { encoding: 'utf-8' })).trim()
+    writeFileSync(join(gitDir, STASH_GUARD_FILE), new Date().toISOString(), 'utf-8')
+  } catch {
+    // ignore
+  }
+}
+
+/** 删除 stash guard 标记文件 */
+export async function removeStashGuard(): Promise<void> {
+  try {
+    const gitDir = await getGitDir()
+    const guardPath = join(gitDir, STASH_GUARD_FILE)
+    if (existsSync(guardPath)) {
+      unlinkSync(guardPath)
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** 同步删除 stash guard（用于信号处理） */
+export function removeStashGuardSync(): void {
+  try {
+    const { execSync } = require('child_process')
+    const gitDir = String(execSync('git rev-parse --git-dir', { encoding: 'utf-8' })).trim()
+    const guardPath = join(gitDir, STASH_GUARD_FILE)
+    if (existsSync(guardPath)) {
+      unlinkSync(guardPath)
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** 检查 stash guard 是否存在 */
+export async function checkStashGuard(): Promise<{ exists: boolean; timestamp?: string }> {
+  try {
+    const gitDir = await getGitDir()
+    const guardPath = join(gitDir, STASH_GUARD_FILE)
+    if (existsSync(guardPath)) {
+      const timestamp = readFileSync(guardPath, 'utf-8').trim()
+      return { exists: true, timestamp }
+    }
+  } catch {
+    // ignore
+  }
+  return { exists: false }
+}
+
+/** 在 stash list 中查找 git-sync-tui 的自动 stash 条目 */
+export async function findStashEntry(): Promise<string | null> {
+  const git = getGit()
+  try {
+    const result = await git.stash(['list'])
+    const lines = result.trim().split('\n')
+    for (const line of lines) {
+      if (line.includes('Auto-stash by git-sync-tui')) {
+        return line
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null
 }
 
 /** 获取工作区状态 */
