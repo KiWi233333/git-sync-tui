@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { Box, Text, useInput } from 'ink'
 import { Spinner } from '@inkjs/ui'
 import { useCommits, useCommitStat } from '../hooks/use-git.js'
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function CommitList({ remote, branch, onSelect, onBack }: Props) {
-  const { data: commits, loading, error } = useCommits(remote, branch, 30)
+  const { data: commits, loading, loadingMore, error, hasMore, loadMore } = useCommits(remote, branch, 100)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [selectedHashes, setSelectedHashes] = useState<Set<string>>(new Set())
   const [shiftMode, setShiftMode] = useState(false)
@@ -22,6 +22,15 @@ export function CommitList({ remote, branch, onSelect, onBack }: Props) {
   const selectedKey = useMemo(() => Array.from(selectedHashes).sort().join(','), [selectedHashes])
   const selectedArray = useMemo(() => Array.from(selectedHashes), [selectedKey])
   const { stat, loading: statLoading } = useCommitStat(selectedArray)
+
+  // 光标接近底部时自动加载更多
+  useEffect(() => {
+    if (!commits || !hasMore || loadingMore) return
+    // 距离底部 5 条时触发加载
+    if (selectedIndex >= commits.length - 5) {
+      loadMore()
+    }
+  }, [selectedIndex, commits?.length, hasMore, loadingMore, loadMore])
 
   const toggleCurrent = () => {
     if (!commits || commits.length === 0) return
@@ -161,12 +170,13 @@ export function CommitList({ remote, branch, onSelect, onBack }: Props) {
           {remote}/{branch}
         </Text>
         <Text color="gray" dimColor>
-          {commits.length} commits
+          {commits.length} commits{hasMore ? '+' : ''}
         </Text>
         <Text color={selectedHashes.size > 0 ? 'cyan' : 'gray'} bold={selectedHashes.size > 0}>
           已选 {selectedHashes.size}
         </Text>
         {shiftMode && <Text color="yellow" bold>SHIFT</Text>}
+        {loadingMore && <Text color="gray" dimColor>加载中...</Text>}
       </Box>
 
       {/* Commit list */}
@@ -193,9 +203,11 @@ export function CommitList({ remote, branch, onSelect, onBack }: Props) {
             </Box>
           )
         })}
-        {startIdx + visibleCount < commits.length && (
+        {startIdx + visibleCount < commits.length ? (
           <Text color="gray" dimColor>  ↓ {commits.length - startIdx - visibleCount} more</Text>
-        )}
+        ) : hasMore ? (
+          <Text color="gray" dimColor>  ↓ 滚动加载更多...</Text>
+        ) : null}
       </Box>
 
       {/* Key hints */}

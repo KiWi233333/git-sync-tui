@@ -13,7 +13,7 @@ const cli = meow(
     -r, --remote <name>       指定远程仓库名称
     -b, --branch <name>       指定远程分支名称
     -c, --commits <hashes>    指定 commit hash（逗号分隔）
-    -n, --count <number>      显示 commit 数量（默认 30）
+    -n, --count <number>      显示 commit 数量（默认 100）
     -m, --mainline            对 merge commit 使用 -m 1
     -y, --yes                 跳过确认直接执行
     --no-stash                跳过 stash 提示
@@ -49,7 +49,7 @@ const cli = meow(
       remote: { type: 'string', shortFlag: 'r' },
       branch: { type: 'string', shortFlag: 'b' },
       commits: { type: 'string', shortFlag: 'c' },
-      count: { type: 'number', shortFlag: 'n', default: 30 },
+      count: { type: 'number', shortFlag: 'n', default: 100 },
       mainline: { type: 'boolean', shortFlag: 'm', default: false },
       yes: { type: 'boolean', shortFlag: 'y', default: false },
       noStash: { type: 'boolean', default: false },

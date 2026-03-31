@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { CommitInfo, RemoteInfo } from '../utils/git.js'
 import * as git from '../utils/git.js'
 
@@ -45,15 +45,59 @@ export function useBranches(remote: string | null) {
   )
 }
 
-/** 获取 commit 列表 */
-export function useCommits(remote: string | null, branch: string | null, count = 30) {
-  return useAsync(
-    () =>
-      remote && branch
-        ? git.getCommits(remote, branch, count)
-        : Promise.resolve([]),
-    [remote, branch, count],
-  )
+/** 获取 commit 列表（支持分页加载更多） */
+export function useCommits(remote: string | null, branch: string | null, pageSize = 100) {
+  const [data, setData] = useState<CommitInfo[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const loadedRef = useRef(0)
+
+  // 初始加载
+  useEffect(() => {
+    if (!remote || !branch) {
+      setData([])
+      setLoading(false)
+      setHasMore(false)
+      return
+    }
+
+    setData(null)
+    setLoading(true)
+    setError(null)
+    setHasMore(true)
+    loadedRef.current = 0
+
+    git.getCommits(remote, branch, pageSize).then((commits) => {
+      setData(commits)
+      setLoading(false)
+      loadedRef.current = commits.length
+      setHasMore(commits.length >= pageSize)
+    }).catch((err: any) => {
+      setError(err.message)
+      setLoading(false)
+    })
+  }, [remote, branch, pageSize])
+
+  // 加载更多
+  const loadMore = useCallback(async () => {
+    if (!remote || !branch || loadingMore || !hasMore) return
+
+    setLoadingMore(true)
+    try {
+      const nextCount = loadedRef.current + pageSize
+      const allCommits = await git.getCommits(remote, branch, nextCount)
+      setData(allCommits)
+      setHasMore(allCommits.length >= nextCount)
+      loadedRef.current = allCommits.length
+    } catch {
+      // 加载更多失败不阻塞
+    }
+    setLoadingMore(false)
+  }, [remote, branch, pageSize, loadingMore, hasMore])
+
+  return { data, loading, loadingMore, error, hasMore, loadMore }
 }
 
 /** 获取 commit stat 预览 */

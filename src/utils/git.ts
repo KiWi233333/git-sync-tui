@@ -89,7 +89,7 @@ export async function getRemoteBranches(remote: string): Promise<string[]> {
 export async function getCommits(
   remote: string,
   branch: string,
-  count: number = 30,
+  count: number = 100,
 ): Promise<CommitInfo[]> {
   const git = getGit()
   const ref = `${remote}/${branch}`
@@ -125,7 +125,7 @@ export async function getCommits(
 export async function getUnsyncedCommits(
   remote: string,
   branch: string,
-  count: number = 30,
+  count: number = 100,
 ): Promise<CommitInfo[]> {
   const git = getGit()
   const ref = `${remote}/${branch}`
