@@ -187,6 +187,10 @@ export function ResultPanel({ selectedHashes, useMainline, noCommit, stashed, on
   }, [tryRestoreStash])
 
   useInput((input, key) => {
+    if (phase === 'done' || phase === 'aborted') {
+      onDone()
+      return
+    }
     if (phase === 'conflict') {
       if (input === 'c' || input === 'C') {
         handleContinue()
@@ -322,6 +326,7 @@ export function ResultPanel({ selectedHashes, useMainline, noCommit, stashed, on
         {stashed && stashRestored === true && (
           <Text color="green">{'✔ '}已恢复工作区变更 (stash pop)</Text>
         )}
+        <Text color="gray" dimColor>按任意键退出</Text>
       </Box>
     )
   }
@@ -367,6 +372,8 @@ export function ResultPanel({ selectedHashes, useMainline, noCommit, stashed, on
           <Text color="gray" dimColor>  已保留原始 commit 信息，可通过 git log 查看</Text>
         </Box>
       )}
+
+      <Text color="gray" dimColor>按任意键退出</Text>
     </Box>
   )
 }
