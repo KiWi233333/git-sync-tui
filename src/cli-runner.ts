@@ -1,10 +1,8 @@
 import * as git from './utils/git.js'
 import { checkForUpdate } from './utils/update-check.js'
 import { createInterface } from 'readline'
-import { createRequire } from 'module'
 
-const require = createRequire(import.meta.url)
-const { version: APP_VERSION } = require('../package.json')
+const APP_VERSION = process.env.APP_VERSION || '0.0.0'
 
 export interface CliOptions {
   remote: string
@@ -23,10 +21,6 @@ function log(msg: string) {
 
 function error(msg: string) {
   process.stderr.write(msg + '\n')
-}
-
-function padEnd(str: string, len: number): string {
-  return str.length >= len ? str : str + ' '.repeat(len - str.length)
 }
 
 async function confirm(message: string): Promise<boolean> {
@@ -97,7 +91,7 @@ async function validateBranch(remote: string, branch: string): Promise<void> {
 }
 
 function formatCommitLine(c: git.CommitInfo): string {
-  return `  ${c.shortHash}  ${padEnd(c.message.slice(0, 60), 62)} ${padEnd(c.author, 16)} ${c.date}`
+  return `  ${c.shortHash}  ${c.message.slice(0, 60).padEnd(62)} ${c.author.padEnd(16)} ${c.date}`
 }
 
 export async function runList(opts: CliOptions): Promise<void> {

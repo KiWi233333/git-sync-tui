@@ -14,10 +14,8 @@ import { UpdateBanner } from './components/update-banner.js'
 import * as git from './utils/git.js'
 import type { CommitInfo } from './utils/git.js'
 import { execSync } from 'child_process'
-import { createRequire } from 'module'
 
-const require = createRequire(import.meta.url)
-const { version: APP_VERSION } = require('../package.json')
+const APP_VERSION = process.env.APP_VERSION || '0.0.0'
 
 type Step = 'checking' | 'stash-recovery' | 'stash-prompt' | 'remote' | 'branch' | 'branch-check' | 'commits' | 'confirm' | 'result'
 
@@ -246,10 +244,12 @@ export function App({ initialRemote, initialBranch }: AppProps) {
         <CommitList
           remote={remote}
           branch={branch}
-          onSelect={(hashes, loadedCommits) => {
+          onSelect={async (hashes, loadedCommits) => {
             setSelectedHashes(hashes)
             setCommits(loadedCommits)
-            // commit 列表已用 --no-merges 过滤，不再检查 merge commits
+            // 检查选中的 commit 是否包含 merge commit
+            const merge = await git.hasMergeCommits(hashes)
+            setHasMerge(merge)
             setStep('confirm')
           }}
           onBack={() => goBack('commits')}
