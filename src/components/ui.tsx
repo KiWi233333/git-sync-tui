@@ -145,14 +145,15 @@ export function Badge({ label, color = 'cyan' }: BadgeProps) {
 interface AppHeaderProps {
   step: number
   stashed?: boolean
+  noCommit?: boolean
 }
 
-export function AppHeader({ step, stashed }: AppHeaderProps) {
+export function AppHeader({ step, stashed, noCommit }: AppHeaderProps) {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box gap={1}>
         <Text backgroundColor="cyan" color="white" bold>{' git-sync-tui '}</Text>
-        <Text color="gray">cherry-pick --no-commit</Text>
+        <Text color="gray">cherry-pick{noCommit ? ' --no-commit' : ''}</Text>
         {stashed && (
           <Text backgroundColor="yellow" color="white" bold>{' STASHED '}</Text>
         )}

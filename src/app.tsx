@@ -7,13 +7,14 @@ import { StashRecovery } from './components/stash-recovery.js'
 import { RemoteSelect } from './components/remote-select.js'
 import { BranchSelect } from './components/branch-select.js'
 import { CommitList } from './components/commit-list.js'
+import { BranchCheck } from './components/branch-check.js'
 import { ConfirmPanel } from './components/confirm-panel.js'
 import { ResultPanel } from './components/result-panel.js'
 import * as git from './utils/git.js'
 import type { CommitInfo } from './utils/git.js'
 import { execSync } from 'child_process'
 
-type Step = 'checking' | 'stash-recovery' | 'stash-prompt' | 'remote' | 'branch' | 'commits' | 'confirm' | 'result'
+type Step = 'checking' | 'stash-recovery' | 'stash-prompt' | 'remote' | 'branch' | 'branch-check' | 'commits' | 'confirm' | 'result'
 
 // Map step to progress number (1-5)
 const STEP_NUMBER: Record<Step, number> = {
@@ -22,6 +23,7 @@ const STEP_NUMBER: Record<Step, number> = {
   'stash-prompt': 0,
   remote: 1,
   branch: 2,
+  'branch-check': 2,
   commits: 3,
   confirm: 4,
   result: 5,
@@ -40,7 +42,7 @@ export function App({ initialRemote, initialBranch }: AppProps) {
 
   // 根据初始参数确定起始步骤
   const entryStep: Step = initialRemote && initialBranch
-    ? 'commits'
+    ? 'branch-check'
     : initialRemote
       ? 'branch'
       : 'remote'
@@ -53,6 +55,7 @@ export function App({ initialRemote, initialBranch }: AppProps) {
   const [commits, setCommits] = useState<CommitInfo[]>([])
   const [hasMerge, setHasMerge] = useState(false)
   const [useMainline, setUseMainline] = useState(false)
+  const [noCommit, setNoCommit] = useState(false)
   const [stashed, setStashed] = useState(false)
   const [guardTimestamp, setGuardTimestamp] = useState<string | undefined>()
   const stashedRef = useRef(false)
@@ -168,6 +171,7 @@ export function App({ initialRemote, initialBranch }: AppProps) {
   const goBack = useCallback((fromStep: Step) => {
     const backMap: Partial<Record<Step, Step>> = {
       branch: 'remote',
+      'branch-check': 'branch',
       commits: 'branch',
       confirm: 'commits',
     }
@@ -183,7 +187,7 @@ export function App({ initialRemote, initialBranch }: AppProps) {
 
   return (
     <Box flexDirection="column">
-      <AppHeader step={STEP_NUMBER[step]} stashed={stashed} />
+      <AppHeader step={STEP_NUMBER[step]} stashed={stashed} noCommit={noCommit} />
 
       {step === 'checking' && (
         <Spinner label="检查工作区状态..." />
@@ -219,9 +223,17 @@ export function App({ initialRemote, initialBranch }: AppProps) {
           remote={remote}
           onSelect={(b) => {
             setBranch(b)
-            setStep('commits')
+            setStep('branch-check')
           }}
           onBack={() => goBack('branch')}
+        />
+      )}
+
+      {step === 'branch-check' && inputReady && (
+        <BranchCheck
+          targetBranch={branch}
+          onContinue={() => setStep('commits')}
+          onBack={() => goBack('branch-check')}
         />
       )}
 
@@ -229,11 +241,10 @@ export function App({ initialRemote, initialBranch }: AppProps) {
         <CommitList
           remote={remote}
           branch={branch}
-          onSelect={async (hashes, loadedCommits) => {
+          onSelect={(hashes, loadedCommits) => {
             setSelectedHashes(hashes)
             setCommits(loadedCommits)
-            const merge = await git.hasMergeCommits(hashes)
-            setHasMerge(merge)
+            // commit 列表已用 --no-merges 过滤，不再检查 merge commits
             setStep('confirm')
           }}
           onBack={() => goBack('commits')}
@@ -246,7 +257,9 @@ export function App({ initialRemote, initialBranch }: AppProps) {
           selectedHashes={selectedHashes}
           hasMerge={hasMerge}
           useMainline={useMainline}
+          noCommit={noCommit}
           onToggleMainline={() => setUseMainline((v) => !v)}
+          onToggleNoCommit={() => setNoCommit((v) => !v)}
           onConfirm={() => setStep('result')}
           onCancel={() => goBack('confirm')}
         />
@@ -256,6 +269,7 @@ export function App({ initialRemote, initialBranch }: AppProps) {
         <ResultPanel
           selectedHashes={selectedHashes}
           useMainline={useMainline}
+          noCommit={noCommit}
           stashed={stashed}
           onStashRestored={markStashRestored}
           onDone={() => {

@@ -20,6 +20,7 @@ export interface CherryPickResult {
   success: boolean
   error?: string
   conflictFiles?: string[]
+  empty?: boolean // cherry-pick --continue 后提交为空
 }
 
 let gitInstance: SimpleGit | null = null
@@ -100,6 +101,8 @@ export async function getCommits(
 
   const result = await git.raw([
     'log', ref,
+    '--first-parent',
+    '--no-merges',
     `--max-count=${count}`,
     '--format=%H%n%h%n%s%n%an%n%ar%n---',
   ])
@@ -236,6 +239,71 @@ export async function getStagedStat(): Promise<string> {
   }
 }
 
+/** 备份分支前缀 */
+const BACKUP_BRANCH_PREFIX = 'git-sync-backup'
+
+/** 创建备份分支（记录当前 HEAD，即使 TUI 崩溃也可手动恢复） */
+export async function createBackupBranch(): Promise<string> {
+  const git = getGit()
+  const timestamp = Date.now()
+  const branchName = `${BACKUP_BRANCH_PREFIX}-${timestamp}`
+  await git.raw(['branch', branchName])
+  return branchName
+}
+
+/** 回退到备份分支并删除它 */
+export async function restoreFromBackup(backupBranch: string): Promise<{ success: boolean; error?: string }> {
+  const git = getGit()
+  try {
+    // 先验证备份分支存在
+    await git.raw(['rev-parse', '--verify', backupBranch])
+    // reset --hard 回到备份点
+    await git.raw(['reset', '--hard', backupBranch])
+    // 删除备份分支
+    await git.raw(['branch', '-D', backupBranch])
+    return { success: true }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `回退失败，请手动执行: git reset --hard ${backupBranch}\n${err.message}`,
+    }
+  }
+}
+
+/** 删除备份分支（成功完成后清理） */
+export async function deleteBackupBranch(backupBranch: string): Promise<void> {
+  const git = getGit()
+  try {
+    await git.raw(['branch', '-D', backupBranch])
+  } catch {
+    // 分支不存在或已删除，忽略
+  }
+}
+
+/** 查找残留的备份分支 */
+export async function findBackupBranches(): Promise<string[]> {
+  const git = getGit()
+  try {
+    const result = await git.raw(['branch', '--list', `${BACKUP_BRANCH_PREFIX}-*`])
+    return result.trim().split('\n').map((b) => b.trim()).filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+/** 获取当前本地分支名 */
+export async function getCurrentBranch(): Promise<string> {
+  const git = getGit()
+  const result = await git.raw(['rev-parse', '--abbrev-ref', 'HEAD'])
+  return result.trim()
+}
+
+/** 从指定分支创建并切换到新分支 */
+export async function createBranchFrom(newBranch: string, baseBranch: string): Promise<void> {
+  const git = getGit()
+  await git.raw(['checkout', '-b', newBranch, baseBranch])
+}
+
 /** 检查工作区是否干净 */
 export async function isWorkingDirClean(): Promise<boolean> {
   const git = getGit()
@@ -272,6 +340,95 @@ export async function abortCherryPick(): Promise<void> {
     await git.raw(['cherry-pick', '--abort'])
   } catch {
     // 可能没有进行中的 cherry-pick
+  }
+}
+
+/** 检查是否有未解决的冲突文件 */
+export async function getConflictFiles(): Promise<string[]> {
+  const git = getGit()
+  const status = await git.status()
+  return status.conflicted
+}
+
+/** 继续 cherry-pick（冲突解决后，带 commit 模式用） */
+export async function continueCherryPick(): Promise<CherryPickResult> {
+  const git = getGit()
+  try {
+    // --no-edit 避免在非交互环境下打开编辑器导致挂起
+    await git.raw(['cherry-pick', '--continue', '--no-edit'])
+    return { success: true }
+  } catch (err: any) {
+    const msg = err.message || ''
+    // 检测空提交情况
+    if (msg.includes('nothing to commit') || msg.includes('empty') || msg.includes('allow-empty')) {
+      return { success: false, error: msg, empty: true }
+    }
+    try {
+      const status = await git.status()
+      const conflictFiles = status.conflicted
+      return {
+        success: false,
+        error: msg,
+        conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
+      }
+    } catch {
+      return { success: false, error: msg }
+    }
+  }
+}
+
+/** 清除 cherry-pick 状态（--no-commit 模式冲突解决后用） */
+export async function clearCherryPickState(): Promise<void> {
+  try {
+    const gitDir = await getGitDir()
+    const cpHead = join(gitDir, 'CHERRY_PICK_HEAD')
+    if (existsSync(cpHead)) {
+      unlinkSync(cpHead)
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** 逐个 cherry-pick（支持 noCommit 模式切换） */
+export async function cherryPickOne(hash: string, useMainline = false, noCommit = true): Promise<CherryPickResult> {
+  const git = getGit()
+  try {
+    const args = ['cherry-pick']
+    if (noCommit) args.push('--no-commit')
+    if (useMainline) args.push('-m', '1')
+    args.push(hash)
+    await git.raw(args)
+    return { success: true }
+  } catch (err: any) {
+    try {
+      const status = await git.status()
+      const conflictFiles = status.conflicted
+      return {
+        success: false,
+        error: err.message,
+        conflictFiles: conflictFiles.length > 0 ? conflictFiles : undefined,
+      }
+    } catch {
+      return { success: false, error: err.message }
+    }
+  }
+}
+
+/** 跳过当前 cherry-pick（空提交时使用） */
+export async function skipCherryPick(): Promise<void> {
+  const git = getGit()
+  await git.raw(['cherry-pick', '--skip'])
+}
+
+/** 检查是否有进行中的 cherry-pick */
+export async function isCherryPickInProgress(): Promise<boolean> {
+  const git = getGit()
+  try {
+    const gitDir = await getGitDir()
+    return existsSync(join(gitDir, 'CHERRY_PICK_HEAD'))
+  } catch {
+    return false
   }
 }
 
