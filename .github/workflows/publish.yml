@@ -9,6 +9,9 @@ permissions:
   contents: write
   id-token: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -26,13 +29,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 
-      # 验证包内容
       - name: Verify package
         run: |
           pnpm pack --dry-run 2>&1 || true
           node dist/cli.js --help
 
-      # Trusted Publishing (OIDC) — 无需 NPM_TOKEN，provenance 自动附加
+      # Trusted Publishing (OIDC) — 无需 NPM_TOKEN
       - run: npm publish --access public
 
       - name: Create GitHub Release
