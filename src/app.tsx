@@ -190,7 +190,7 @@ export function App({ initialRemote, initialBranch }: AppProps) {
 
   return (
     <Box flexDirection="column">
-      <AppHeader step={STEP_NUMBER[step]} stashed={stashed} noCommit={noCommit} />
+      <AppHeader step={STEP_NUMBER[step]} stashed={stashed} noCommit={noCommit} version={APP_VERSION} />
 
       {step === 'checking' && (
         <Spinner label="检查工作区状态..." />

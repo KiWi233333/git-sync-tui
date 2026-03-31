@@ -146,13 +146,17 @@ interface AppHeaderProps {
   step: number
   stashed?: boolean
   noCommit?: boolean
+  version?: string
 }
 
-export function AppHeader({ step, stashed, noCommit }: AppHeaderProps) {
+export function AppHeader({ step, stashed, noCommit, version }: AppHeaderProps) {
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box gap={1}>
         <Text backgroundColor="cyan" color="white" bold>{' git-sync-tui '}</Text>
+        {version && (
+          <Text color="gray" dimColor>v{version}</Text>
+        )}
         <Text color="gray">cherry-pick{noCommit ? ' --no-commit' : ''}</Text>
         {stashed && (
           <Text backgroundColor="yellow" color="white" bold>{' STASHED '}</Text>
