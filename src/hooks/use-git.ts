@@ -69,7 +69,7 @@ export function useCommits(remote: string | null, branch: string | null, pageSiz
     setHasMore(true)
     loadedRef.current = 0
 
-    git.getCommits(remote, branch, pageSize).then((commits) => {
+    git.getUnsyncedCommits(remote, branch, pageSize).then((commits) => {
       setData(commits)
       setLoading(false)
       loadedRef.current = commits.length
@@ -87,7 +87,7 @@ export function useCommits(remote: string | null, branch: string | null, pageSiz
     setLoadingMore(true)
     try {
       const nextCount = loadedRef.current + pageSize
-      const allCommits = await git.getCommits(remote, branch, nextCount)
+      const allCommits = await git.getUnsyncedCommits(remote, branch, nextCount)
       setData(allCommits)
       setHasMore(allCommits.length >= nextCount)
       loadedRef.current = allCommits.length

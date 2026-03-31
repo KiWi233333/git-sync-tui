@@ -8,6 +8,7 @@ export interface CommitInfo {
   message: string
   author: string
   date: string
+  synced?: boolean
 }
 
 export interface RemoteInfo {
@@ -50,16 +51,20 @@ export async function addRemote(name: string, url: string): Promise<void> {
 export async function getRemoteBranches(remote: string): Promise<string[]> {
   const git = getGit()
 
-  // 先尝试 fetch 更新远程引用
-  let fetchOk = false
+  // 优先用 ls-remote 查询（只获取分支列表，不下载数据，更快）
   try {
-    await git.fetch(remote)
-    fetchOk = true
+    const lsResult = await git.raw(['ls-remote', '--heads', remote])
+    if (lsResult.trim()) {
+      return lsResult.trim().split('\n')
+        .map((line) => line.replace(/^.*refs\/heads\//, ''))
+        .filter(Boolean)
+        .sort()
+    }
   } catch {
-    // fetch 失败，后面尝试 fallback
+    // ls-remote 失败（网络问题），fallback 到本地缓存
   }
 
-  // 从本地缓存读取远程分支
+  // fallback: 从本地缓存读取远程分支
   const result = await git.branch(['-r'])
   const prefix = `${remote}/`
   const branches = result.all
@@ -69,20 +74,7 @@ export async function getRemoteBranches(remote: string): Promise<string[]> {
 
   if (branches.length > 0) return branches
 
-  // 本地缓存为空时，用 ls-remote 作为 fallback（适用于新添加的 remote）
-  try {
-    const lsResult = await git.raw(['ls-remote', '--heads', remote])
-    if (!lsResult.trim()) return []
-    return lsResult.trim().split('\n')
-      .map((line) => line.replace(/^.*refs\/heads\//, ''))
-      .filter(Boolean)
-      .sort()
-  } catch {
-    if (!fetchOk) {
-      throw new Error(`无法连接远程仓库 '${remote}'，请检查网络或仓库地址`)
-    }
-    return []
-  }
+  throw new Error(`无法获取远程仓库 '${remote}' 的分支列表，请检查网络或仓库地址`)
 }
 
 /** 获取远程分支的 commit 列表 */
@@ -152,9 +144,8 @@ export async function getUnsyncedCommits(
 
     return allCommits.map((c) => ({
       ...c,
-      // 标记是否已同步（通过 full hash 前缀匹配）
-      _synced: !unsyncedHashes.has(c.hash),
-    })) as any
+      synced: !unsyncedHashes.has(c.hash),
+    }))
   } catch {
     // cherry 命令失败时返回全部
     return allCommits

@@ -25,7 +25,7 @@ export function StepProgress({ current }: StepProgressProps) {
               {isActive ? <Text bold>{label}</Text> : label}
             </Text>
             {!isLast && (
-              <Text color="gray" dimColor> ─ </Text>
+              <Text color={isDone ? 'green' : 'gray'} dimColor={!isDone}> {'─'} </Text>
             )}
           </React.Fragment>
         )
@@ -72,10 +72,8 @@ export function KeyHints({ hints }: { hints: KeyHint[] }) {
     <Box gap={1} flexWrap="wrap">
       {hints.map(({ key, label }) => (
         <Box key={key}>
-          <Text color="gray" dimColor>[</Text>
-          <Text color="cyan">{key}</Text>
-          <Text color="gray" dimColor>]</Text>
-          <Text color="gray" dimColor> {label}</Text>
+          <Text backgroundColor="gray" color="white" bold>{` ${key} `}</Text>
+          <Text color="gray"> {label}</Text>
         </Box>
       ))}
     </Box>
@@ -89,7 +87,7 @@ export function InlineKeys({ hints }: { hints: KeyHint[] }) {
     <Box gap={1}>
       {hints.map(({ key, label }, i) => (
         <React.Fragment key={key}>
-          <Text color="green">[{key}]</Text>
+          <Text color="green" bold>[{key}]</Text>
           <Text> {label}</Text>
           {i < hints.length - 1 && <Text color="gray" dimColor> / </Text>}
         </React.Fragment>
@@ -152,13 +150,14 @@ interface AppHeaderProps {
 export function AppHeader({ step, stashed }: AppHeaderProps) {
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box>
-        <Text bold color="cyan">{'◇ '}</Text>
-        <Text bold>git-sync-tui</Text>
-        <Text color="gray">  cherry-pick --no-commit</Text>
-        {stashed && <Text color="yellow"> ▪ stashed</Text>}
+      <Box gap={1}>
+        <Text backgroundColor="cyan" color="white" bold>{' git-sync-tui '}</Text>
+        <Text color="gray">cherry-pick --no-commit</Text>
+        {stashed && (
+          <Text backgroundColor="yellow" color="white" bold>{' STASHED '}</Text>
+        )}
       </Box>
-      <Box>
+      <Box marginTop={0}>
         <Text color="gray" dimColor>{'  '}</Text>
         <StepProgress current={step} />
       </Box>
