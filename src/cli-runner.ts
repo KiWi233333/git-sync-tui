@@ -1,5 +1,10 @@
 import * as git from './utils/git.js'
+import { checkForUpdate } from './utils/update-check.js'
 import { createInterface } from 'readline'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const { version: APP_VERSION } = require('../package.json')
 
 export interface CliOptions {
   remote: string
@@ -195,10 +200,18 @@ export async function runExec(opts: CliOptions): Promise<void> {
   }
 }
 
+async function printUpdateNotice(): Promise<void> {
+  const info = await checkForUpdate(APP_VERSION)
+  if (info.hasUpdate) {
+    log(`\n💡 新版本可用 ${info.latest} (当前 ${info.current}) → npm i -g git-sync-tui`)
+  }
+}
+
 export async function runCli(opts: CliOptions): Promise<void> {
   if (opts.list) {
     await runList(opts)
   } else {
     await runExec(opts)
   }
+  await printUpdateNotice()
 }

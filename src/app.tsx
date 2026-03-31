@@ -10,9 +10,14 @@ import { CommitList } from './components/commit-list.js'
 import { BranchCheck } from './components/branch-check.js'
 import { ConfirmPanel } from './components/confirm-panel.js'
 import { ResultPanel } from './components/result-panel.js'
+import { UpdateBanner } from './components/update-banner.js'
 import * as git from './utils/git.js'
 import type { CommitInfo } from './utils/git.js'
 import { execSync } from 'child_process'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const { version: APP_VERSION } = require('../package.json')
 
 type Step = 'checking' | 'stash-recovery' | 'stash-prompt' | 'remote' | 'branch' | 'branch-check' | 'commits' | 'confirm' | 'result'
 
@@ -278,6 +283,8 @@ export function App({ initialRemote, initialBranch }: AppProps) {
           }}
         />
       )}
+
+      <UpdateBanner currentVersion={APP_VERSION} />
     </Box>
   )
 }
