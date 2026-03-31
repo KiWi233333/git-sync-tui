@@ -1,5 +1,6 @@
 import simpleGit, { type SimpleGit } from 'simple-git'
 import { existsSync, writeFileSync, unlinkSync, readFileSync } from 'fs'
+import { execSync } from 'child_process'
 import { join } from 'path'
 
 export interface CommitInfo {
@@ -26,8 +27,9 @@ export interface CherryPickResult {
 let gitInstance: SimpleGit | null = null
 
 export function getGit(cwd?: string): SimpleGit {
-  if (!gitInstance || cwd) {
-    gitInstance = simpleGit(cwd)
+  if (cwd) return simpleGit(cwd)
+  if (!gitInstance) {
+    gitInstance = simpleGit()
   }
   return gitInstance
 }
@@ -171,13 +173,13 @@ export async function getMultiCommitStat(hashes: string[]): Promise<string> {
   if (hashes.length === 0) return ''
   const git = getGit()
   try {
-    // 用 diff-tree 逐个获取再合并
-    const stats: string[] = []
-    for (const hash of hashes) {
-      const result = await git.raw(['diff-tree', '--stat', '--no-commit-id', '-r', hash])
-      if (result.trim()) stats.push(`${hash.substring(0, 7)}:\n${result.trim()}`)
-    }
-    return stats.join('\n\n')
+    const results = await Promise.all(
+      hashes.map(async (hash) => {
+        const result = await git.raw(['diff-tree', '--stat', '--no-commit-id', '-r', hash])
+        return result.trim() ? `${hash.substring(0, 7)}:\n${result.trim()}` : ''
+      }),
+    )
+    return results.filter(Boolean).join('\n\n')
   } catch {
     return '(无法获取 stat 信息)'
   }
@@ -462,7 +464,6 @@ export async function writeStashGuard(): Promise<void> {
 /** 同步写入 stash guard（用于信号处理） */
 export function writeStashGuardSync(): void {
   try {
-    const { execSync } = require('child_process')
     const gitDir = String(execSync('git rev-parse --git-dir', { encoding: 'utf-8' })).trim()
     writeFileSync(join(gitDir, STASH_GUARD_FILE), new Date().toISOString(), 'utf-8')
   } catch {
@@ -486,7 +487,6 @@ export async function removeStashGuard(): Promise<void> {
 /** 同步删除 stash guard（用于信号处理） */
 export function removeStashGuardSync(): void {
   try {
-    const { execSync } = require('child_process')
     const gitDir = String(execSync('git rev-parse --git-dir', { encoding: 'utf-8' })).trim()
     const guardPath = join(gitDir, STASH_GUARD_FILE)
     if (existsSync(guardPath)) {

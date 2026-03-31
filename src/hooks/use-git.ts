@@ -15,10 +15,13 @@ function useAsync<T>(fn: () => Promise<T>, deps: any[] = []): AsyncState<T> & { 
     error: null,
   })
 
+  const fnRef = useRef(fn)
+  fnRef.current = fn
+
   const load = useCallback(async () => {
     setState({ data: null, loading: true, error: null })
     try {
-      const data = await fn()
+      const data = await fnRef.current()
       setState({ data, loading: false, error: null })
     } catch (err: any) {
       setState({ data: null, loading: false, error: err.message })
@@ -104,22 +107,25 @@ export function useCommits(remote: string | null, branch: string | null, pageSiz
 export function useCommitStat(hashes: string[]) {
   const [stat, setStat] = useState('')
   const [loading, setLoading] = useState(false)
+  const hashKey = hashes.join(',')
+  const stableHashes = useRef(hashes)
+  stableHashes.current = hashes
 
   useEffect(() => {
-    if (hashes.length === 0) {
+    if (stableHashes.current.length === 0) {
       setStat('')
       return
     }
 
     setLoading(true)
-    git.getMultiCommitStat(hashes).then((s) => {
+    git.getMultiCommitStat(stableHashes.current).then((s) => {
       setStat(s)
       setLoading(false)
     }).catch(() => {
       setStat('(获取失败)')
       setLoading(false)
     })
-  }, [hashes.join(',')])
+  }, [hashKey])
 
   return { stat, loading }
 }

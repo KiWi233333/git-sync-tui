@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Box, Text, useInput } from 'ink'
 import { Spinner } from '@inkjs/ui'
 import { StatusPanel, InlineKeys, SectionHeader } from './ui.js'
@@ -18,6 +18,8 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [matched, setMatched] = useState(false)
   const autoCreated = useRef(false)
+  const onContinueRef = useRef(onContinue)
+  onContinueRef.current = onContinue
 
   useEffect(() => {
     git.getCurrentBranch().then((branch) => {
@@ -30,7 +32,7 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
 
   // 分支匹配 → 自动跳过
   useEffect(() => {
-    if (matched) onContinue()
+    if (matched) onContinueRef.current()
   }, [matched])
 
   // 当前分支是 main/master → 自动创建目标分支
@@ -41,7 +43,7 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
     autoCreated.current = true
     setCreating(true)
     git.createBranchFrom(targetBranch, currentBranch).then(() => {
-      onContinue()
+      onContinueRef.current()
     }).catch((err: any) => {
       setCreating(false)
       setError(err.message)
