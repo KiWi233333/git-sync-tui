@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Box, Text, useInput } from 'ink'
-import { Select, Spinner, TextInput } from '@inkjs/ui'
+import { Spinner, TextInput } from '@inkjs/ui'
 import { useRemotes } from '../hooks/use-git.js'
-import { SectionHeader, KeyHints } from './ui.js'
+import { SectionHeader } from './ui.js'
 import * as git from '../utils/git.js'
 
 interface Props {
@@ -15,7 +15,6 @@ type Phase = 'list' | 'input-url' | 'input-name' | 'adding'
 /** 从 URL 或路径中提取默认远程名称 */
 function extractRemoteName(url: string): string {
   const trimmed = url.trim().replace(/\/+$/, '').replace(/\.git$/, '')
-  // 取最后一段：支持 / 和 \ 分隔符，也支持 git@host:user/repo 格式
   const lastSegment = trimmed.split(/[/\\:]+/).filter(Boolean).pop() || ''
   return lastSegment
 }
@@ -23,17 +22,36 @@ function extractRemoteName(url: string): string {
 export function RemoteSelect({ onSelect, onBack }: Props) {
   const { data: remotes, loading, error, reload } = useRemotes()
   const [phase, setPhase] = useState<Phase>('list')
+  const [cursorIndex, setCursorIndex] = useState(0)
   const [customUrl, setCustomUrl] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
 
-  useInput((_input, key) => {
+  // 总选项数 = remotes + "添加远程仓库"
+  const totalItems = (remotes?.length || 0) + 1
+
+  useInput((input, key) => {
+    if (phase !== 'list') {
+      if (key.escape) {
+        if (phase === 'input-name') {
+          setPhase('input-url')
+        } else if (phase === 'input-url') {
+          setPhase('list')
+        }
+      }
+      return
+    }
+
     if (key.escape) {
-      if (phase === 'input-name') {
+      onBack?.()
+    } else if (key.upArrow) {
+      setCursorIndex((prev) => Math.max(0, prev - 1))
+    } else if (key.downArrow) {
+      setCursorIndex((prev) => Math.min(totalItems - 1, prev + 1))
+    } else if (key.return) {
+      if (remotes && cursorIndex < remotes.length) {
+        onSelect(remotes[cursorIndex].name)
+      } else {
         setPhase('input-url')
-      } else if (phase === 'input-url') {
-        setPhase('list')
-      } else if (phase === 'list') {
-        onBack?.()
       }
     }
   })
@@ -43,7 +61,7 @@ export function RemoteSelect({ onSelect, onBack }: Props) {
   }
 
   if (error) {
-    return <Text color="red">✖ 获取远程仓库失败: {error}</Text>
+    return <Text color="red">{'✖ '}获取远程仓库失败: {error}</Text>
   }
 
   if (phase === 'adding') {
@@ -54,7 +72,7 @@ export function RemoteSelect({ onSelect, onBack }: Props) {
     return (
       <Box flexDirection="column" gap={1}>
         <SectionHeader title="添加远程仓库" />
-        {addError && <Text color="red">✖ {addError}</Text>}
+        {addError && <Text color="red">{'✖ '}{addError}</Text>}
         <Box>
           <Text color="gray">URL ▸ </Text>
           <TextInput
@@ -69,7 +87,7 @@ export function RemoteSelect({ onSelect, onBack }: Props) {
             }}
           />
         </Box>
-        <Text color="gray" dimColor>  支持 HTTPS / SSH 地址</Text>
+        <Text color="gray" dimColor>{'  '}支持 HTTPS / SSH 地址</Text>
       </Box>
     )
   }
@@ -79,7 +97,7 @@ export function RemoteSelect({ onSelect, onBack }: Props) {
     return (
       <Box flexDirection="column" gap={1}>
         <SectionHeader title="添加远程仓库" subtitle={customUrl} />
-        {addError && <Text color="red">✖ {addError}</Text>}
+        {addError && <Text color="red">{'✖ '}{addError}</Text>}
         <Box>
           <Text color="gray">名称 ▸ </Text>
           <TextInput
@@ -112,30 +130,43 @@ export function RemoteSelect({ onSelect, onBack }: Props) {
     )
   }
 
-  const options = [
-    ...(remotes || []).map((r) => ({
-      label: `${r.name}  ${r.fetchUrl}`,
-      value: r.name,
-    })),
-    {
-      label: '+ 添加远程仓库...',
-      value: '__add_custom__',
-    },
-  ]
+  // 计算 name 列最大宽度用于对齐
+  const maxNameLen = Math.max(...(remotes || []).map((r) => r.name.length), 0)
 
   return (
-    <Box flexDirection="column" gap={1}>
+    <Box flexDirection="column">
       <SectionHeader title="选择远程仓库" />
-      <Select
-        options={options}
-        onChange={(value) => {
-          if (value === '__add_custom__') {
-            setPhase('input-url')
-          } else {
-            onSelect(value)
-          }
-        }}
-      />
+
+      <Box flexDirection="column" marginTop={1}>
+        {(remotes || []).map((r, i) => {
+          const isCursor = i === cursorIndex
+          return (
+            <Box key={r.name}>
+              <Text color={isCursor ? 'cyan' : 'gray'}>
+                {isCursor ? '›' : ' '}
+              </Text>
+              <Text> </Text>
+              <Text color={isCursor ? 'cyan' : 'white'} bold={isCursor}>
+                {r.name.padEnd(maxNameLen + 2)}
+              </Text>
+              <Text color="gray" dimColor>
+                {r.fetchUrl}
+              </Text>
+            </Box>
+          )
+        })}
+
+        {/* 添加远程仓库选项 */}
+        <Box>
+          <Text color={cursorIndex === (remotes?.length || 0) ? 'cyan' : 'gray'}>
+            {cursorIndex === (remotes?.length || 0) ? '›' : ' '}
+          </Text>
+          <Text> </Text>
+          <Text color="green" dimColor={cursorIndex !== (remotes?.length || 0)}>
+            + 添加远程仓库...
+          </Text>
+        </Box>
+      </Box>
     </Box>
   )
 }

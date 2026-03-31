@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { Box, Text, useInput } from 'ink'
-import { Select, Spinner, TextInput } from '@inkjs/ui'
+import { Spinner, TextInput } from '@inkjs/ui'
 import { useBranches } from '../hooks/use-git.js'
 import { SectionHeader } from './ui.js'
 
@@ -13,48 +13,90 @@ interface Props {
 export function BranchSelect({ remote, onSelect, onBack }: Props) {
   const { data: branches, loading, error } = useBranches(remote)
   const [filter, setFilter] = useState('')
+  const [cursorIndex, setCursorIndex] = useState(0)
 
-  useInput((_input, key) => {
-    if (key.escape) onBack?.()
-  })
-
-  const filteredOptions = useMemo(() => {
+  const filteredBranches = useMemo(() => {
     if (!branches) return []
-    const filtered = filter
+    return filter
       ? branches.filter((b) => b.toLowerCase().includes(filter.toLowerCase()))
       : branches
-    return filtered.map((b) => ({ label: b, value: b }))
   }, [branches, filter])
+
+  // 可见窗口
+  const visibleCount = 10
+  const startIdx = Math.max(0, Math.min(cursorIndex - Math.floor(visibleCount / 2), filteredBranches.length - visibleCount))
+  const visibleBranches = filteredBranches.slice(startIdx, startIdx + visibleCount)
+
+  useInput((input, key) => {
+    if (key.escape) {
+      onBack?.()
+    } else if (key.upArrow) {
+      setCursorIndex((prev) => Math.max(0, prev - 1))
+    } else if (key.downArrow) {
+      setCursorIndex((prev) => Math.min(filteredBranches.length - 1, prev + 1))
+    } else if (key.return) {
+      if (filteredBranches.length > 0) {
+        onSelect(filteredBranches[cursorIndex])
+      }
+    }
+  })
 
   if (loading) {
     return <Spinner label={`获取 ${remote} 的分支列表...`} />
   }
 
   if (error) {
-    return <Text color="red">✖ 获取分支列表失败: {error}</Text>
+    return <Text color="red">{'✖ '}获取分支列表失败: {error}</Text>
   }
 
   if (!branches || branches.length === 0) {
-    return <Text color="red">✖ 未找到远程分支</Text>
+    return <Text color="red">{'✖ '}未找到远程分支</Text>
   }
 
   return (
-    <Box flexDirection="column" gap={1}>
-      <SectionHeader title={`选择分支`} subtitle={`${remote} · ${branches.length} 个分支`} />
-      <Box>
-        <Text color="gray">/ </Text>
+    <Box flexDirection="column">
+      <SectionHeader title="选择分支" subtitle={`${remote} · ${branches.length} 个分支`} />
+
+      <Box marginTop={1}>
+        <Text color="cyan">/ </Text>
         <TextInput
           placeholder="输入关键字过滤..."
-          onChange={setFilter}
+          onChange={(val) => {
+            setFilter(val)
+            setCursorIndex(0)
+          }}
         />
         {filter && (
-          <Text color="gray" dimColor> · 匹配 {filteredOptions.length}</Text>
+          <Text color="gray" dimColor> · 匹配 {filteredBranches.length}</Text>
         )}
       </Box>
-      {filteredOptions.length > 0 ? (
-        <Select options={filteredOptions} onChange={onSelect} />
+
+      {filteredBranches.length > 0 ? (
+        <Box flexDirection="column" marginTop={1}>
+          {startIdx > 0 && (
+            <Text color="gray" dimColor>{'  '}↑ {startIdx} more</Text>
+          )}
+          {visibleBranches.map((b, i) => {
+            const actualIdx = startIdx + i
+            const isCursor = actualIdx === cursorIndex
+            return (
+              <Box key={b}>
+                <Text color={isCursor ? 'cyan' : 'gray'}>
+                  {isCursor ? '›' : ' '}
+                </Text>
+                <Text> </Text>
+                <Text color={isCursor ? 'cyan' : 'white'} bold={isCursor}>
+                  {b}
+                </Text>
+              </Box>
+            )
+          })}
+          {startIdx + visibleCount < filteredBranches.length && (
+            <Text color="gray" dimColor>{'  '}↓ {filteredBranches.length - startIdx - visibleCount} more</Text>
+          )}
+        </Box>
       ) : (
-        <Text color="yellow">▲ 无匹配分支</Text>
+        <Text color="yellow">{'▲ '}无匹配分支</Text>
       )}
     </Box>
   )

@@ -25,7 +25,7 @@ export function StepProgress({ current }: StepProgressProps) {
               {isActive ? <Text bold>{label}</Text> : label}
             </Text>
             {!isLast && (
-              <Text color={isDone ? 'green' : 'gray'} dimColor={!isDone}> {'─'} </Text>
+              <Text color={isDone ? 'green' : 'gray'} dimColor={!isDone}> {'───'} </Text>
             )}
           </React.Fragment>
         )
@@ -45,7 +45,7 @@ export function SectionHeader({ title, subtitle }: SectionHeaderProps) {
   return (
     <Box flexDirection="column">
       <Text bold color="cyan">
-        {'▸ '}{title}
+        {'▾ '}{title}
       </Text>
       {subtitle && (
         <Text color="gray" dimColor>{'  '}{subtitle}</Text>
