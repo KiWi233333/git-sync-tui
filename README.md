@@ -15,14 +15,15 @@
 
 <p align="center">
   Cherry-pick commits from remote branches with an intuitive terminal UI.<br>
-  Select specific commits, preview changes, and sync with <code>--no-commit</code> mode for safe review.
+  Multi-select commits, preview diff stats, handle conflicts interactively, and sync safely with backup &amp; stash protection.
 </p>
 
 <p align="center">
   <a href="#-features">Features</a> ·
   <a href="#-quick-start">Quick Start</a> ·
   <a href="#-installation">Installation</a> ·
-  <a href="#-workflow">Workflow</a>
+  <a href="#-workflow">Workflow</a> ·
+  <a href="#%EF%B8%8F-cli-options">CLI Options</a>
 </p>
 
 <p align="center">
@@ -35,11 +36,18 @@
 
 ## ✨ Features
 
-- 🎯 **Multi-select commits** — Cherry-pick non-consecutive commits with Space / Enter
+- 🎯 **Multi-select commits** — Select non-consecutive commits with Space, range-select with Shift+↑↓, toggle all with `a`, invert with `i`
 - 🔍 **Branch search** — Fuzzy filter branches by keyword
-- 👀 **Diff preview** — See `--stat` summary of selected commits before executing
-- ⚡ **Safe mode** — `--no-commit` stages changes for review, never auto-commits
-- ⚠️ **Conflict handling** — Clear display of conflicted files when cherry-pick fails
+- 👀 **Diff preview** — Scrollable `--stat` summary panel with `j`/`k` navigation
+- ⚡ **Dual mode** — `--no-commit` stages changes for review, or commit individually preserving original messages
+- 🔀 **One-by-one cherry-pick** — Executes commits sequentially, pausing on conflicts for interactive resolution
+- ⚠️ **Conflict handling** — Shows conflicted files, resolve in another terminal, then continue/abort/quit
+- 🛡️ **Safe backup** — Creates a backup branch before execution; full rollback on abort
+- 📦 **Auto stash** — Detects uncommitted changes, offers to stash, auto-restores after sync
+- 🔄 **Stash recovery** — Detects interrupted sessions and offers to recover stashed changes
+- 🌿 **Branch check** — Auto-creates target branch from main/master if not on it
+- ✅ **Synced markers** — Marks already-synced commits as `[synced]` in the commit list
+- 🖥️ **CLI mode** — Non-interactive mode with `-r -b -c` flags for scripting
 - 🌐 **Universal** — Works in any git repository, any language
 
 ## 🚀 Quick Start
@@ -64,35 +72,95 @@ npm install -g git-sync-tui
 ## 🔄 Workflow
 
 ```
-Select Remote  →  Select Branch  →  Multi-select Commits  →  Preview Changes
-                                                                     ↓
-Review & Commit manually  ←  Cherry-pick --no-commit (staged, not committed)
+Check workspace  →  Select Remote  →  Select Branch  →  Branch Check  →  Multi-select Commits
+     ↓                                                                          ↓
+Auto stash                                                               Preview diff stats
+(if needed)                                                                     ↓
+                                                                       Confirm & choose mode
+                                                                               ↓
+                                                              Cherry-pick one-by-one (with backup)
+                                                                               ↓
+                                                                    Handle conflicts / Done
+                                                                               ↓
+                                                                    Restore stash & exit
 ```
 
 ## ⌨️ Keyboard Shortcuts
 
+### Commit Selection
+
 | Key | Action |
 |-----|--------|
-| `↑` `↓` | Navigate items |
+| `↑` `↓` | Navigate commits |
 | `Space` | Toggle commit selection |
+| `Shift`+`↑`/`↓` | Range select |
+| `a` | Select all / Deselect all |
+| `i` | Invert selection |
+| `r` | Select from top to cursor |
+| `j` / `k` | Scroll diff stat preview |
 | `Enter` | Confirm selection |
-| `y` / `n` | Confirm / cancel execution |
-| `/` | Search (in branch list) |
+| `Esc` | Go back |
+
+### Confirm Panel
+
+| Key | Action |
+|-----|--------|
+| `y` | Confirm execution |
+| `n` | Cancel |
+| `c` | Toggle commit mode (--no-commit / individual) |
+| `m` | Toggle `-m 1` for merge commits |
+| `Esc` | Go back |
+
+### Conflict Handling
+
+| Key | Action |
+|-----|--------|
+| `c` | Continue (after resolving conflicts) |
+| `a` | Abort (rollback all changes) |
+| `q` | Quit (keep current state) |
+
+## ⚙️ CLI Options
+
+```
+Usage
+  $ git-sync-tui [options]
+
+Options
+  -r, --remote <name>       Remote name
+  -b, --branch <name>       Remote branch name
+  -c, --commits <hashes>    Commit hashes (comma-separated)
+  -n, --count <number>      Number of commits to show (default: 100)
+  -m, --mainline            Use -m 1 for merge commits
+  -y, --yes                 Skip confirmation
+  --no-stash                Skip stash prompt
+  --list                    List remote branch commits and exit
+
+Modes
+  No arguments               Interactive TUI mode
+  -r -b --list               List commits (plain text)
+  -r -b -c                   CLI mode, confirm before execution
+  -r -b -c --yes             CLI mode, execute directly
+  -r or -r -b only           TUI mode, skip completed steps
+
+Examples
+  $ git-sync-tui                                           # TUI mode
+  $ git-sync-tui -r upstream -b main --list                # List commits
+  $ git-sync-tui -r upstream -b main -c abc1234 --yes      # Execute directly
+  $ git-sync-tui -r upstream -b main -c abc1234,def5678    # Confirm then execute
+  $ git-sync-tui -r upstream                               # TUI mode, skip remote select
+```
 
 ## 📋 After Sync
 
-Changes are staged in your working tree (not committed). You can:
+**--no-commit mode** — Changes are staged in your working tree (not committed):
 
 ```bash
-# Review staged changes
-git diff --cached
-
-# Commit when ready
-git commit -m "sync: cherry-picked commits from feature-branch"
-
-# Or discard all changes
-git reset HEAD
+git diff --cached                        # Review staged changes
+git commit -m "sync: cherry-picked commits from feature-branch"  # Commit
+git reset HEAD                           # Or discard all changes
 ```
+
+**Individual commit mode** — Original commit messages are preserved. Check with `git log`.
 
 ## 💡 Use Cases
 
@@ -107,8 +175,8 @@ git reset HEAD
 ```bash
 git clone https://github.com/KiWi233333/git-sync-tui.git
 cd git-sync-tui
-npm install
-npm start
+pnpm install
+pnpm start
 ```
 
 ## 🏗️ Tech Stack
@@ -116,6 +184,7 @@ npm start
 - [Ink](https://github.com/vadimdemedes/ink) — React for interactive CLI apps
 - [@inkjs/ui](https://github.com/inkjs/ui) — UI components for Ink
 - [simple-git](https://github.com/steveukx/git-js) — Git commands interface
+- [meow](https://github.com/sindresorhus/meow) — CLI argument parsing
 
 ## 🤝 Contributing
 
