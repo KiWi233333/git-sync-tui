@@ -6,6 +6,7 @@ import { SectionHeader } from './ui.js'
 import * as git from '../utils/git.js'
 
 interface Props {
+  lastRemote?: string  // 上次选择的 remote，用于定位光标
   onSelect: (remote: string) => void
   onBack?: () => void
 }
@@ -19,12 +20,27 @@ function extractRemoteName(url: string): string {
   return lastSegment
 }
 
-export function RemoteSelect({ onSelect, onBack }: Props) {
+export function RemoteSelect({ lastRemote, onSelect, onBack }: Props) {
   const { data: remotes, loading, error, reload } = useRemotes()
   const [phase, setPhase] = useState<Phase>('list')
-  const [cursorIndex, setCursorIndex] = useState(0)
+  // 根据上次选择设置初始光标位置
+  const [cursorIndex, setCursorIndex] = useState(() => {
+    if (lastRemote && remotes) {
+      const idx = remotes.findIndex((r) => r.name === lastRemote)
+      if (idx >= 0) return idx
+    }
+    return 0
+  })
   const [customUrl, setCustomUrl] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
+
+  // 当 remotes 加载完成后，定位到上次选择
+  React.useEffect(() => {
+    if (lastRemote && remotes && remotes.length > 0) {
+      const idx = remotes.findIndex((r) => r.name === lastRemote)
+      if (idx >= 0) setCursorIndex(idx)
+    }
+  }, [remotes, lastRemote])
 
   // 总选项数 = remotes + "添加远程仓库"
   const totalItems = (remotes?.length || 0) + 1
@@ -140,6 +156,7 @@ export function RemoteSelect({ onSelect, onBack }: Props) {
       <Box flexDirection="column" marginTop={1}>
         {(remotes || []).map((r, i) => {
           const isCursor = i === cursorIndex
+          const isLastUsed = r.name === lastRemote
           return (
             <Box key={r.name}>
               <Text color={isCursor ? 'cyan' : 'gray'}>
@@ -152,6 +169,9 @@ export function RemoteSelect({ onSelect, onBack }: Props) {
               <Text color="gray" dimColor>
                 {r.fetchUrl}
               </Text>
+              {isLastUsed && !isCursor && (
+                <Text color="yellow" dimColor> ★</Text>
+              )}
             </Box>
           )
         })}

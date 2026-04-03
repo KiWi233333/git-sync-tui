@@ -1,9 +1,16 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { Box, Text, useInput } from 'ink'
+import { Box, Text, useInput, useStdout } from 'ink'
 import { Spinner } from '@inkjs/ui'
 import { useCommits, useCommitStat } from '../hooks/use-git.js'
 import { SectionHeader, KeyHints, Divider } from './ui.js'
 import type { CommitInfo } from '../utils/git.js'
+
+/** 截断字符串到指定宽度（考虑中文字符宽度） */
+function truncate(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str
+  // 简单截断，保留maxLen-1个字符 + '…'
+  return str.slice(0, maxLen - 1) + '…'
+}
 
 interface Props {
   remote: string
@@ -64,6 +71,8 @@ function StatPanel({ stat, loading, count }: { stat: string; loading: boolean; c
 }
 
 export function CommitList({ remote, branch, onSelect, onBack }: Props) {
+  const { stdout } = useStdout()
+  const terminalWidth = stdout?.columns ?? 80
   const { data: commits, loading, loadingMore, error, hasMore, loadMore } = useCommits(remote, branch, 100)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [selectedHashes, setSelectedHashes] = useState<Set<string>>(new Set())
@@ -226,6 +235,9 @@ export function CommitList({ remote, branch, onSelect, onBack }: Props) {
 
   const unsyncedTotal = commits.length - syncedCount
 
+  // 计算 message 可用宽度：总宽度 - 前缀(12) - 后缀预留(25) - 余量(2)
+  const maxMsgWidth = Math.max(10, terminalWidth - 39)
+
   return (
     <Box flexDirection="column" gap={1}>
       <SectionHeader title="选择要同步的 commit" />
@@ -288,7 +300,7 @@ export function CommitList({ remote, branch, onSelect, onBack }: Props) {
                 color={isSynced ? 'gray' : isSelected ? 'green' : 'white'}
                 dimColor={isSynced}
               >
-                {' '}{c.message}
+                {' '}{truncate(c.message, maxMsgWidth)}
               </Text>
               <Text color="gray" dimColor> {c.author} · {c.date}</Text>
               {isSynced && <Text color="gray" dimColor> [已同步]</Text>}

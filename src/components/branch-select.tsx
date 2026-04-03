@@ -6,14 +6,30 @@ import { SectionHeader } from './ui.js'
 
 interface Props {
   remote: string
+  lastBranch?: string  // 上次选择的 branch，用于定位光标
   onSelect: (branch: string) => void
   onBack?: () => void
 }
 
-export function BranchSelect({ remote, onSelect, onBack }: Props) {
+export function BranchSelect({ remote, lastBranch, onSelect, onBack }: Props) {
   const { data: branches, loading, error } = useBranches(remote)
   const [filter, setFilter] = useState('')
-  const [cursorIndex, setCursorIndex] = useState(0)
+  // 根据上次选择设置初始光标位置
+  const [cursorIndex, setCursorIndex] = useState(() => {
+    if (lastBranch && branches) {
+      const idx = branches.indexOf(lastBranch)
+      if (idx >= 0) return idx
+    }
+    return 0
+  })
+
+  // 当 branches 加载完成后，定位到上次选择
+  React.useEffect(() => {
+    if (lastBranch && branches && branches.length > 0) {
+      const idx = branches.indexOf(lastBranch)
+      if (idx >= 0) setCursorIndex(idx)
+    }
+  }, [branches, lastBranch])
 
   const filteredBranches = useMemo(() => {
     if (!branches) return []
@@ -79,6 +95,7 @@ export function BranchSelect({ remote, onSelect, onBack }: Props) {
           {visibleBranches.map((b, i) => {
             const actualIdx = startIdx + i
             const isCursor = actualIdx === cursorIndex
+            const isLastUsed = b === lastBranch
             return (
               <Box key={b}>
                 <Text color={isCursor ? 'cyan' : 'gray'}>
@@ -88,6 +105,9 @@ export function BranchSelect({ remote, onSelect, onBack }: Props) {
                 <Text color={isCursor ? 'cyan' : 'white'} bold={isCursor}>
                   {b}
                 </Text>
+                {isLastUsed && !isCursor && (
+                  <Text color="yellow" dimColor> ★</Text>
+                )}
               </Box>
             )
           })}

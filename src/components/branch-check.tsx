@@ -4,8 +4,6 @@ import { Spinner } from '@inkjs/ui'
 import { StatusPanel, InlineKeys, SectionHeader } from './ui.js'
 import * as git from '../utils/git.js'
 
-const BASE_BRANCHES = ['main', 'master']
-
 interface Props {
   targetBranch: string
   onContinue: () => void
@@ -17,7 +15,6 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [matched, setMatched] = useState(false)
-  const autoCreated = useRef(false)
   const onContinueRef = useRef(onContinue)
   onContinueRef.current = onContinue
 
@@ -35,21 +32,6 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
     if (matched) onContinueRef.current()
   }, [matched])
 
-  // 当前分支是 main/master → 自动创建目标分支
-  useEffect(() => {
-    if (currentBranch === null || matched || autoCreated.current) return
-    if (!BASE_BRANCHES.includes(currentBranch)) return
-
-    autoCreated.current = true
-    setCreating(true)
-    git.createBranchFrom(targetBranch, currentBranch).then(() => {
-      onContinueRef.current()
-    }).catch((err: any) => {
-      setCreating(false)
-      setError(err.message)
-    })
-  }, [currentBranch, matched, targetBranch])
-
   const doCreate = () => {
     if (!currentBranch) return
     setCreating(true)
@@ -64,8 +46,6 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
 
   useInput((input, key) => {
     if (creating || currentBranch === null || matched) return
-    // 当前是 main/master 时已自动创建，不需要手动输入
-    if (BASE_BRANCHES.includes(currentBranch)) return
 
     if (input === 'y' || input === 'Y') {
       doCreate()
@@ -84,7 +64,7 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
     return <Spinner label={`正在从 ${currentBranch} 创建分支 ${targetBranch}...`} />
   }
 
-  // 非 main/master 分支 → 让用户选择
+  // 分支不一致 → 让用户确认
   return (
     <Box flexDirection="column" gap={1}>
       <SectionHeader title="分支检查" />
@@ -104,11 +84,21 @@ export function BranchCheck({ targetBranch, onContinue, onBack }: Props) {
         <Text color="red">{'✖ '}{error}</Text>
       )}
 
-      <Box>
-        <Text bold>从 {currentBranch} 创建 {targetBranch} 分支? </Text>
+      <Box flexDirection="column" gap={1}>
+        <Box>
+          <Text bold>是否新建分支 </Text>
+          <Text color="cyan" bold>{targetBranch}</Text>
+          <Text bold> 并切换？</Text>
+        </Box>
+        <Text color="gray" dimColor>
+          {'  '}• 选 [y] 将从 {currentBranch} 创建 {targetBranch} 分支
+        </Text>
+        <Text color="gray" dimColor>
+          {'  '}• 选 [n] 将在当前分支 {currentBranch} 上直接同步（不创建新分支）
+        </Text>
         <InlineKeys hints={[
-          { key: 'y', label: '创建并切换' },
-          { key: 'n', label: '跳过' },
+          { key: 'y', label: '新建分支' },
+          { key: 'n', label: '在当前分支同步' },
           { key: 'Esc', label: '返回' },
         ]} />
       </Box>

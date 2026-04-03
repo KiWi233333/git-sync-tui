@@ -17,6 +17,11 @@ export default defineConfig({
   define: {
     'process.env.APP_VERSION': JSON.stringify(pkg.version),
   },
+  // 代码压缩
+  minify: true,
+  minifySyntax: true,
+  minifyWhitespace: true,
+  minifyIdentifiers: true,
   esbuildOptions(options) {
     options.jsx = 'automatic'
   },

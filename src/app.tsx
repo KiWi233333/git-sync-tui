@@ -12,6 +12,7 @@ import { ConfirmPanel } from './components/confirm-panel.js'
 import { ResultPanel } from './components/result-panel.js'
 import { UpdateBanner } from './components/update-banner.js'
 import * as git from './utils/git.js'
+import { loadConfig, saveConfig } from './utils/config.js'
 import type { CommitInfo } from './utils/git.js'
 import { execSync } from 'child_process'
 
@@ -43,7 +44,10 @@ interface AppProps {
 export function App({ initialRemote, initialBranch }: AppProps) {
   const { exit } = useApp()
 
-  // 根据初始参数确定起始步骤
+  // 加载保存的配置（仅启动时执行一次）
+  const savedConfig = useRef(loadConfig())
+
+  // 根据初始参数或配置确定起始步骤
   const entryStep: Step = initialRemote && initialBranch
     ? 'branch-check'
     : initialRemote
@@ -52,13 +56,14 @@ export function App({ initialRemote, initialBranch }: AppProps) {
 
   const [step, setStepRaw] = useState<Step>('checking')
   const [inputReady, setInputReady] = useState(true)
-  const [remote, setRemote] = useState(initialRemote || '')
-  const [branch, setBranch] = useState(initialBranch || '')
+  // 优先使用传入参数，其次使用保存的配置
+  const [remote, setRemote] = useState(initialRemote || savedConfig.current.lastRemote || '')
+  const [branch, setBranch] = useState(initialBranch || savedConfig.current.lastBranch || '')
   const [selectedHashes, setSelectedHashes] = useState<string[]>([])
   const [commits, setCommits] = useState<CommitInfo[]>([])
   const [hasMerge, setHasMerge] = useState(false)
   const [useMainline, setUseMainline] = useState(false)
-  const [noCommit, setNoCommit] = useState(false)
+  const [noCommit, setNoCommit] = useState(savedConfig.current.noCommit ?? false)
   const [stashed, setStashed] = useState(false)
   const [guardTimestamp, setGuardTimestamp] = useState<string | undefined>()
   const stashedRef = useRef(false)
@@ -213,8 +218,10 @@ export function App({ initialRemote, initialBranch }: AppProps) {
 
       {step === 'remote' && inputReady && (
         <RemoteSelect
+          lastRemote={savedConfig.current.lastRemote}
           onSelect={(r) => {
             setRemote(r)
+            saveConfig({ lastRemote: r })
             setStep('branch')
           }}
           onBack={() => goBack('remote')}
@@ -224,8 +231,10 @@ export function App({ initialRemote, initialBranch }: AppProps) {
       {step === 'branch' && inputReady && (
         <BranchSelect
           remote={remote}
+          lastBranch={savedConfig.current.lastBranch}
           onSelect={(b) => {
             setBranch(b)
+            saveConfig({ lastBranch: b })
             setStep('branch-check')
           }}
           onBack={() => goBack('branch')}
@@ -264,7 +273,11 @@ export function App({ initialRemote, initialBranch }: AppProps) {
           useMainline={useMainline}
           noCommit={noCommit}
           onToggleMainline={() => setUseMainline((v) => !v)}
-          onToggleNoCommit={() => setNoCommit((v) => !v)}
+          onToggleNoCommit={() => {
+            const newValue = !noCommit
+            setNoCommit(newValue)
+            saveConfig({ noCommit: newValue })
+          }}
           onConfirm={() => setStep('result')}
           onCancel={() => goBack('confirm')}
         />
