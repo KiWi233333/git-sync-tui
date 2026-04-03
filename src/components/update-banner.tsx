@@ -27,7 +27,7 @@ export function UpdateBanner({ currentVersion }: UpdateBannerProps) {
       <Text color="yellow">
         {'💡 '}新版本可用 <Text bold color="green">{info.latest}</Text>
         <Text color="gray">{' (当前 '}{info.current}{')'}</Text>
-        <Text color="cyan">{' → npm i -g git-sync-tui'}</Text>
+        <Text color="cyan">{` → ${info.updateCommand}`}</Text>
       </Text>
     </Box>
   )

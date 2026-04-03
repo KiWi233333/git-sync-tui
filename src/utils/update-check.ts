@@ -2,6 +2,7 @@ import https from 'node:https'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { getInstallInfo, type InstallInfo } from './install-source.js'
 
 const PKG_NAME = 'git-sync-tui'
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000 // 24h
@@ -78,6 +79,7 @@ export interface UpdateInfo {
   hasUpdate: boolean
   current: string
   latest: string
+  updateCommand: string
 }
 
 /**
@@ -85,7 +87,13 @@ export interface UpdateInfo {
  * triggers background fetch if cache is stale.
  */
 export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo> {
-  const noUpdate: UpdateInfo = { hasUpdate: false, current: currentVersion, latest: currentVersion }
+  const installInfo = getInstallInfo()
+  const noUpdate: UpdateInfo = {
+    hasUpdate: false,
+    current: currentVersion,
+    latest: currentVersion,
+    updateCommand: installInfo.updateCommand,
+  }
 
   // Check cache first
   const cache = readCache()
@@ -94,6 +102,7 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
       hasUpdate: compareVersions(currentVersion, cache.latest),
       current: currentVersion,
       latest: cache.latest,
+      updateCommand: installInfo.updateCommand,
     }
   }
 
@@ -107,5 +116,6 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     hasUpdate: compareVersions(currentVersion, latest),
     current: currentVersion,
     latest,
+    updateCommand: installInfo.updateCommand,
   }
 }
