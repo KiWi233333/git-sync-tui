@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { Box, Text, useInput } from 'ink'
 import { Spinner, TextInput } from '@inkjs/ui'
 import { useBranches } from '../hooks/use-git.js'
@@ -14,6 +14,7 @@ interface Props {
 export function BranchSelect({ remote, lastBranch, onSelect, onBack }: Props) {
   const { data: branches, loading, error } = useBranches(remote)
   const [filter, setFilter] = useState('')
+  const prevFilterRef = useRef('')
   // 根据上次选择设置初始光标位置
   const [cursorIndex, setCursorIndex] = useState(() => {
     if (lastBranch && branches) {
@@ -24,12 +25,20 @@ export function BranchSelect({ remote, lastBranch, onSelect, onBack }: Props) {
   })
 
   // 当 branches 加载完成后，定位到上次选择
-  React.useEffect(() => {
+  useEffect(() => {
     if (lastBranch && branches && branches.length > 0) {
       const idx = branches.indexOf(lastBranch)
       if (idx >= 0) setCursorIndex(idx)
     }
   }, [branches, lastBranch])
+
+  // 只有当 filter 实际改变时才重置光标
+  useEffect(() => {
+    if (filter !== prevFilterRef.current) {
+      prevFilterRef.current = filter
+      setCursorIndex(0)
+    }
+  }, [filter])
 
   const filteredBranches = useMemo(() => {
     if (!branches) return []
@@ -77,10 +86,7 @@ export function BranchSelect({ remote, lastBranch, onSelect, onBack }: Props) {
         <Text color="cyan">/ </Text>
         <TextInput
           placeholder="输入关键字过滤..."
-          onChange={(val) => {
-            setFilter(val)
-            setCursorIndex(0)
-          }}
+          onChange={setFilter}
         />
         {filter && (
           <Text color="gray" dimColor> · 匹配 {filteredBranches.length}</Text>
