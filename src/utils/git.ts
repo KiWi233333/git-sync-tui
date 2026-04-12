@@ -203,8 +203,8 @@ export async function hasMergeCommits(hashes: string[]): Promise<boolean> {
 export async function cherryPick(hashes: string[], useMainline = false): Promise<CherryPickResult> {
   const git = getGit()
   try {
-    // 逐个 cherry-pick --no-commit，保持顺序（从旧到新）
-    const orderedHashes = [...hashes].reverse()
+    // 逐个 cherry-pick --no-commit，按传入顺序执行
+    const orderedHashes = [...hashes]
     for (const hash of orderedHashes) {
       const args = ['cherry-pick', '--no-commit']
       if (useMainline) {
@@ -304,6 +304,23 @@ export async function getCurrentBranch(): Promise<string> {
 export async function createBranchFrom(newBranch: string, baseBranch: string): Promise<void> {
   const git = getGit()
   await git.raw(['checkout', '-b', newBranch, baseBranch])
+}
+
+/** 检查本地分支是否存在 */
+export async function branchExists(branch: string): Promise<boolean> {
+  const git = getGit()
+  try {
+    await git.raw(['rev-parse', '--verify', `refs/heads/${branch}`])
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 切换到指定本地分支 */
+export async function switchBranch(branch: string): Promise<void> {
+  const git = getGit()
+  await git.raw(['checkout', branch])
 }
 
 /** 检查工作区是否干净 */

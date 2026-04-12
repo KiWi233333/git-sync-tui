@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { Box, Text, useInput, useStdout } from 'ink'
 import { Spinner } from '@inkjs/ui'
 import { useCommits, useCommitStat } from '../hooks/use-git.js'
+import { orderSelectedHashesByCommits } from '../utils/commit-selection.js'
 import { SectionHeader, KeyHints, Divider } from './ui.js'
 import type { CommitInfo } from '../utils/git.js'
 
@@ -212,7 +213,7 @@ export function CommitList({ remote, branch, onSelect, onBack }: Props) {
       onBack?.()
     } else if (key.return) {
       if (selectedHashes.size > 0) {
-        onSelect(Array.from(selectedHashes), commits)
+        onSelect(orderSelectedHashesByCommits(commits, selectedHashes), commits)
       }
     }
   })
