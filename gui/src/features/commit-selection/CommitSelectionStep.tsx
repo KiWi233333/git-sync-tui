@@ -1,4 +1,9 @@
+import { Badge, Button, Table, Typography, Space, Alert, Layout } from "antd";
+import { RefreshCw, ArrowLeft, Play, CheckCircle2 } from "lucide-react";
 import type { CommitItem } from "../../types/workbench";
+import { summarizeQueue } from "./commitFilters";
+
+const { Text, Title } = Typography;
 
 interface CommitSelectionStepProps {
   targetRepoName: string;
@@ -35,88 +40,105 @@ export function CommitSelectionStep({
   onStart,
   onRefresh,
 }: CommitSelectionStepProps) {
+  const queueSummary = summarizeQueue(orderedQueue);
+
+  const columns = [
+    {
+      title: "Commit Message",
+      dataIndex: "message",
+      key: "message",
+      render: (text: string) => <Text strong style={{ color: "#fafafa" }}>{text}</Text>,
+    },
+    {
+      title: "Author",
+      dataIndex: "author",
+      key: "author",
+      width: 150,
+      render: (text: string) => <Text type="secondary">{text}</Text>,
+    },
+    {
+      title: "Date",
+      dataIndex: "date",
+      key: "date",
+      width: 150,
+      render: (text: string) => <Text type="secondary">{text}</Text>,
+    },
+    {
+      title: "Hash",
+      dataIndex: "shortHash",
+      key: "shortHash",
+      width: 100,
+      render: (text: string) => <Text code>{text}</Text>,
+    },
+  ];
+
   return (
-    <section className="commits-view">
-      <div className="section-heading section-heading--compact">
+    <Layout style={{ height: "100%", background: "#09090b" }}>
+      <div style={{ padding: "20px 32px", borderBottom: "1px solid #27272a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div className="section-kicker">Commit Queue</div>
-          <h1>选择要同步的 Commits</h1>
-          <p>
-            来源分支：<code>{targetRepoName}/{targetBranch}</code>。你可以任意跨跃勾选，系统会自动按时间线正序执行。
-          </p>
+          <Text type="secondary">选择 Commits</Text>
+          <Title level={4} style={{ margin: 0, color: "#fafafa" }}>{targetRepoName} / {targetBranch}</Title>
         </div>
-        <button className="secondary-action secondary-action--small" onClick={onRefresh}>
-          刷新列表
-        </button>
+        <Space size="middle">
+          <Badge count={commits.length} showZero color="#27272a" style={{ color: "#fafafa" }} />
+          <Badge count={queueSummary.totalCommits} showZero color={queueSummary.totalCommits > 0 ? "#52c41a" : "#27272a"} />
+          <Button icon={<RefreshCw size={16} />} onClick={onRefresh}>
+            刷新
+          </Button>
+        </Space>
       </div>
 
-      <div className="commit-toolbar">
-        <div className="overview-pill">
-          <span className="overview-pill__label">数据源</span>
-          <span className="overview-pill__value commit-toolbar__mono">{commitSourceLabel}</span>
-        </div>
-        <div className="overview-pill">
-          <span className="overview-pill__label">已选 Commit</span>
-          <span className="overview-pill__value">{orderedQueue.length}</span>
-        </div>
-        <div className="overview-pill">
-          <span className="overview-pill__label">执行顺序</span>
-          <span className="overview-pill__value commit-toolbar__mono">{queueText || "--"}</span>
-        </div>
-      </div>
+      <Layout.Content style={{ padding: 32, overflow: "auto" }}>
+        {commitError ? (
+          <Alert message="读取 commits 失败" description={commitError} type="error" showIcon style={{ marginBottom: 24 }} />
+        ) : null}
 
-      <div className="table-shell">
-        {commitLoading ? (
-          <div className="table-state">正在加载目标仓库 commits...</div>
-        ) : commitError ? (
-          <div className="table-state table-state--error">读取 commits 失败：{commitError}</div>
-        ) : commits.length === 0 ? (
-          <div className="table-state">当前分支暂无可显示 commits。</div>
-        ) : (
-          <table className="commit-table">
-            <thead>
-              <tr>
-                <th className="w-check">选中</th>
-                <th>Hash</th>
-                <th>Message</th>
-                <th>Author</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {commits.map((commit) => {
-                const checked = selectedHashes.has(commit.hash);
-                return (
-                  <tr key={commit.hash} className={checked ? "is-selected" : ""}>
-                    <td>
-                      <input type="checkbox" checked={checked} onChange={() => onToggleCommit(commit.hash)} />
-                    </td>
-                    <td className="mono">{commit.shortHash}</td>
-                    <td className="message-cell">{commit.message}</td>
-                    <td>{commit.author}</td>
-                    <td>{commit.date}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+        <Table
+          rowSelection={{
+            type: "checkbox",
+            selectedRowKeys: Array.from(selectedHashes),
+            onChange: (selectedRowKeys) => {
+              const currentKeys = Array.from(selectedHashes);
+              const added = selectedRowKeys.filter((key) => !currentKeys.includes(key as string));
+              const removed = currentKeys.filter((key) => !selectedRowKeys.includes(key as string));
+              added.forEach((key) => onToggleCommit(key as string));
+              removed.forEach((key) => onToggleCommit(key as string));
+            },
+          }}
+          columns={columns}
+          dataSource={commits.map((c) => ({ ...c, key: c.hash }))}
+          loading={commitLoading}
+          pagination={false}
+          size="middle"
+          rowClassName={(record) => selectedHashes.has(record.hash) ? "selected-row" : ""}
+          style={{ background: "#18181b", borderRadius: 8, border: "1px solid #27272a" }}
+        />
+      </Layout.Content>
 
-      <div className="footer-bar">
-        <div className="helper-text">
-          已选择 <strong>{orderedQueue.length}</strong> 个 Commit。系统将按时间线正序 <code>{queueText}</code> 执行。
-          {sessionError ? <span className="helper-text helper-text--error"> 会话创建失败：{sessionError}</span> : null}
+      <div style={{ padding: "16px 32px", background: "#18181b", borderTop: "1px solid #27272a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          {orderedQueue.length > 0 ? (
+            <Space>
+              <CheckCircle2 size={16} color="#52c41a" />
+              <Text>已选择 <strong style={{ color: "#fafafa" }}>{orderedQueue.length}</strong> 个 Commit</Text>
+              <Text type="secondary" code>{queueText}</Text>
+            </Space>
+          ) : (
+            <Text type="secondary">请选择需要 Cherry-Pick 的 Commit</Text>
+          )}
+          {sessionError && (
+            <Text type="danger" style={{ marginLeft: 16 }}>会话创建失败：{sessionError}</Text>
+          )}
         </div>
-        <div className="footer-actions">
-          <button className="ghost-action" onClick={onBack}>
-            返回
-          </button>
-          <button className="primary-action" onClick={onStart} disabled={startDisabled}>
-            开始 Cherry-Pick
-          </button>
-        </div>
+        <Space size="middle">
+          <Button icon={<ArrowLeft size={16} />} onClick={onBack}>
+            返回上一步
+          </Button>
+          <Button type="primary" icon={<Play size={16} />} onClick={onStart} disabled={startDisabled} size="large">
+            开始执行
+          </Button>
+        </Space>
       </div>
-    </section>
+    </Layout>
   );
 }

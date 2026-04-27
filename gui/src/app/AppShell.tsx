@@ -1,3 +1,4 @@
+import { Layout } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   abortSession,
@@ -12,11 +13,13 @@ import {
   pickDirectory,
   startSession,
 } from "../bridge/desktop";
-import { LoadingOverlay } from "../components/layout/LoadingOverlay";
 import { TopBar } from "../components/layout/TopBar";
 import { CommitSelectionStep } from "../features/commit-selection/CommitSelectionStep";
+import { ExecutionProgressStep } from "../features/execution/ExecutionProgressStep";
+import { FinishSummaryStep } from "../features/finish/FinishSummaryStep";
 import { MergeWorkbenchStep } from "../features/merge-workbench/MergeWorkbenchStep";
 import { WorkspaceSetupStep } from "../features/workspace-setup/WorkspaceSetupStep";
+import { getWorkspaceReadiness } from "../features/workspace-setup/workspaceReadiness";
 import { branchesByRepo, commits as mockCommits, repositories } from "../mocks/workbench";
 import {
   getConflictFiles,
@@ -24,6 +27,7 @@ import {
   getStagedFiles,
   useWorkbenchStore,
 } from "../stores/useWorkbenchStore";
+import type { SessionDetail } from "../types/workbench";
 
 export function AppShell() {
   const [currentManagedPath, setCurrentManagedPath] = useState<string | null>(null);
@@ -42,6 +46,7 @@ export function AppShell() {
   const [cloneError, setCloneError] = useState<string | null>(null);
   const [managedRepositories, setManagedRepositories] = useState<import("../types/workbench").ManagedRepositoryRecord[]>([]);
   const [managedRepoLoading, setManagedRepoLoading] = useState(false);
+  const [createSameBranchName, setCreateSameBranchName] = useState(true);
 
   const {
     view,
@@ -126,6 +131,16 @@ export function AppShell() {
       : branchesByRepo[targetRepoId] ?? [];
 
   const targetCommitPath = targetRepoId === "target-local" ? targetLocalPath : targetManagedPath;
+  const currentWorkspacePath = currentRepoMode === "local" ? currentLocalPath : currentManagedPath;
+  const targetWorkspacePath = targetRepoId === "target-local" ? targetLocalPath : targetManagedPath;
+  const workspaceReadiness = getWorkspaceReadiness({
+    desktopStatus,
+    currentPath: currentWorkspacePath,
+    targetPath: targetWorkspacePath,
+    currentIsClean: currentRepoMode === "local" ? currentRepoCleanState : currentManagedCleanState,
+    targetIsClean: targetRepoId === "target-local" ? targetRepoCleanState : targetManagedCleanState,
+    cloneLoading,
+  });
 
   useEffect(() => {
     if (!targetCommitPath) {
@@ -175,6 +190,16 @@ export function AppShell() {
 
 # Conflicts:
 #   ${filePath ?? activeFile?.path ?? "manual-resolution"}`;
+  }
+
+  function setViewForSessionDetail(detail: SessionDetail) {
+    if (detail.status === "conflicted") {
+      setView("merge");
+    } else if (detail.status === "completed") {
+      setView("finish");
+    } else {
+      setView("executing");
+    }
   }
 
   function handleCurrentRepoModeChange(mode: "clone" | "local") {
@@ -354,13 +379,14 @@ export function AppShell() {
 
     setSessionLoading(true);
     setSessionError(null);
-    setView("loading");
+    setView("executing");
 
     try {
       const created = await createSession({
         currentRepoName: currentRepo.name,
         currentRepoPath: currentSessionPath,
         currentBranch,
+        createSameBranchName,
         targetRepoName: targetRepo.name,
         targetRepoPath: targetSessionPath,
         targetBranch,
@@ -372,7 +398,7 @@ export function AppShell() {
       setActiveConflictFile(detail.conflictFiles[0]?.path ?? activeConflictFile);
       resetResolutions(detail.conflictFiles);
       setCommitMessage(buildCommitMessage(detail.currentCommit?.message ?? "cherry-pick", detail.conflictFiles[0]?.path));
-      setView("merge");
+      setViewForSessionDetail(detail);
     } catch (error: unknown) {
       setSessionError(error instanceof Error ? error.message : "session-start-failed");
       setView("commits");
@@ -402,6 +428,7 @@ export function AppShell() {
         Object.fromEntries(Object.entries(resolutions)),
       );
       setSessionDetail(detail);
+      setViewForSessionDetail(detail);
 
       if (detail.currentCommit) {
         setActiveConflictFile(detail.conflictFiles[0]?.path ?? activeConflictFile);
@@ -412,6 +439,26 @@ export function AppShell() {
       }
     } catch (error: unknown) {
       setSessionError(error instanceof Error ? error.message : "session-continue-failed");
+    } finally {
+      setSessionLoading(false);
+    }
+  }
+
+  async function handleRefreshSession() {
+    if (!sessionDetail?.id) {
+      setSessionError("当前没有可刷新的会话");
+      return;
+    }
+
+    setSessionLoading(true);
+    setSessionError(null);
+
+    try {
+      const detail = await getSessionDetail(sessionDetail.id);
+      setSessionDetail(detail);
+      setViewForSessionDetail(detail);
+    } catch (error: unknown) {
+      setSessionError(error instanceof Error ? error.message : "session-refresh-failed");
     } finally {
       setSessionLoading(false);
     }
@@ -438,7 +485,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="app-shell">
+    <Layout className="app-shell" style={{ minHeight: "100vh", background: "transparent" }}>
       <TopBar
         showPath={view !== "setup"}
         currentRepoName={currentRepo.name}
@@ -446,7 +493,7 @@ export function AppShell() {
         targetBranch={targetBranch}
       />
 
-      <main className="workspace">
+      <Layout.Content style={{ height: "calc(100vh - 56px)", overflow: "hidden" }}>
         {view === "setup" && (
           <WorkspaceSetupStep
             currentRepoMode={currentRepoMode}
@@ -476,7 +523,9 @@ export function AppShell() {
             desktopStatus={desktopStatus}
             cloneLoading={cloneLoading}
             cloneError={cloneError}
+            readiness={workspaceReadiness}
             managedRepoLoading={managedRepoLoading}
+            createSameBranchName={createSameBranchName}
             onCurrentRepoModeChange={handleCurrentRepoModeChange}
             onCurrentRepoChange={handleCurrentRepoChange}
             onCurrentBranchChange={setCurrentBranch}
@@ -492,7 +541,10 @@ export function AppShell() {
             onUseManagedForTarget={handleUseManagedForTarget}
             onPickCurrentDirectory={handlePickCurrentDirectory}
             onPickTargetDirectory={handlePickTargetDirectory}
-            onNext={() => setView("commits")}
+            onCreateSameBranchNameChange={setCreateSameBranchName}
+            onNext={() => {
+              if (workspaceReadiness.canContinue) setView("commits");
+            }}
           />
         )}
 
@@ -554,9 +606,29 @@ export function AppShell() {
             onAbort={handleAbortSession}
           />
         )}
-      </main>
 
-      {view === "loading" && <LoadingOverlay queueText={queueText} />}
-    </div>
+        {view === "executing" && (
+          <ExecutionProgressStep
+            sessionDetail={sessionDetail}
+            sessionLoading={sessionLoading}
+            sessionError={sessionError ?? sessionDetail?.lastError ?? null}
+            onRetry={handleRefreshSession}
+            onAbort={handleAbortSession}
+          />
+        )}
+
+        {view === "finish" && (
+          <FinishSummaryStep
+            sessionDetail={sessionDetail}
+            onNewSession={() => {
+              setSessionError(null);
+              setSessionLoading(false);
+              setView("setup");
+            }}
+            onBackToCommits={() => setView("commits")}
+          />
+        )}
+      </Layout.Content>
+    </Layout>
   );
 }

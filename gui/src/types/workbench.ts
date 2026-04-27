@@ -1,7 +1,7 @@
-export type ViewStep = "setup" | "commits" | "loading" | "merge";
+export type ViewStep = "setup" | "commits" | "executing" | "merge" | "finish";
 export type RepoMode = "clone" | "local";
 export type MergeViewMode = "diff" | "merge";
-export type Resolution = "unresolved" | "incoming" | "current" | "both";
+export type Resolution = "unresolved" | "incoming" | "current" | "both" | "manual";
 
 export interface RepositoryOption {
   id: string;
@@ -70,6 +70,7 @@ export interface SessionCreatePayload {
   currentRepoName: string;
   currentRepoPath: string | null;
   currentBranch: string;
+  createSameBranchName: boolean;
   targetRepoName: string;
   targetRepoPath: string | null;
   targetBranch: string;
@@ -82,6 +83,7 @@ export interface SessionDetail {
   currentRepoName: string;
   currentRepoPath: string | null;
   currentBranch: string;
+  createSameBranchName: boolean;
   targetRepoName: string;
   targetRepoPath: string | null;
   targetBranch: string;

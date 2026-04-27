@@ -29,6 +29,7 @@ pub struct SessionCreatePayload {
     pub current_repo_name: String,
     pub current_repo_path: Option<String>,
     pub current_branch: String,
+    pub create_same_branch_name: bool,
     pub target_repo_name: String,
     pub target_repo_path: Option<String>,
     pub target_branch: String,
@@ -70,6 +71,7 @@ pub struct SessionDetail {
     pub current_repo_name: String,
     pub current_repo_path: Option<String>,
     pub current_branch: String,
+    pub create_same_branch_name: bool,
     pub target_repo_name: String,
     pub target_repo_path: Option<String>,
     pub target_branch: String,
@@ -174,13 +176,55 @@ fn fetch_target_branch(session: &SessionDetail) -> Result<(), String> {
 
     run_git(
         repo_path,
-        &["fetch", "--no-tags", target_repo_path, &session.target_branch],
+        &[
+            "fetch",
+            "--no-tags",
+            target_repo_path,
+            &session.target_branch,
+        ],
     )
     .map(|_| ())
 }
 
+fn branch_exists(repo_path: &str, branch: &str) -> Result<bool, String> {
+    let branch_ref = format!("refs/heads/{branch}");
+    let (success, _, _) = run_git_with_status(repo_path, &["rev-parse", "--verify", &branch_ref])?;
+    Ok(success)
+}
+
+fn prepare_current_branch(session: &mut SessionDetail) -> Result<(), String> {
+    let Some(repo_path) = session.current_repo_path.as_deref() else {
+        return Err("当前会话缺少 current repository path".to_string());
+    };
+    let repo_path = repo_path.to_string();
+
+    run_git(&repo_path, &["checkout", &session.current_branch])?;
+    if !session.create_same_branch_name || session.current_branch == session.target_branch {
+        return Ok(());
+    }
+
+    if branch_exists(&repo_path, &session.target_branch)? {
+        run_git(&repo_path, &["checkout", &session.target_branch])?;
+    } else {
+        run_git(
+            &repo_path,
+            &[
+                "checkout",
+                "-b",
+                &session.target_branch,
+                &session.current_branch,
+            ],
+        )?;
+    }
+    session.current_branch = session.target_branch.clone();
+    Ok(())
+}
+
 fn is_cherry_pick_in_progress(repo_path: &str) -> Result<bool, String> {
-    let (success, _, _) = run_git_with_status(repo_path, &["rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"])?;
+    let (success, _, _) = run_git_with_status(
+        repo_path,
+        &["rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD"],
+    )?;
     Ok(success)
 }
 
@@ -207,7 +251,10 @@ fn normalize_file_status(x: char, y: char) -> String {
     }
 }
 
-fn parse_conflict_chunks(file_path: &Path, relative_path: &str) -> Result<Vec<ConflictChunk>, String> {
+fn parse_conflict_chunks(
+    file_path: &Path,
+    relative_path: &str,
+) -> Result<Vec<ConflictChunk>, String> {
     let content = fs::read_to_string(file_path)
         .map_err(|error| format!("读取冲突文件失败 {}: {error}", relative_path))?;
     let lines = content.lines().collect::<Vec<_>>();
@@ -323,7 +370,11 @@ fn write_merge_message(repo_path: &str, message: &str) -> Result<(), String> {
         .map_err(|error| format!("写入 MERGE_MSG 失败: {error}"))
 }
 
-fn render_resolved_content(content: &str, relative_path: &str, resolutions: &HashMap<String, String>) -> Result<String, String> {
+fn render_resolved_content(
+    content: &str,
+    relative_path: &str,
+    resolutions: &HashMap<String, String>,
+) -> Result<String, String> {
     let mut output = Vec::new();
     let lines = content.lines().collect::<Vec<_>>();
     let mut index = 0usize;
@@ -417,7 +468,8 @@ fn run_until_conflict_or_complete(session: &mut SessionDetail) -> Result<(), Str
             .cloned()
             .ok_or_else(|| "session queue 越界".to_string())?;
 
-        let (success, _stdout, stderr) = run_git_with_status(repo_path, &["cherry-pick", &commit.hash])?;
+        let (success, _stdout, stderr) =
+            run_git_with_status(repo_path, &["cherry-pick", &commit.hash])?;
         if success {
             session.completed_count += 1;
             session.current_commit_index = None;
@@ -480,6 +532,7 @@ pub fn session_create(
         current_repo_name: payload.current_repo_name,
         current_repo_path: Some(root_path),
         current_branch: payload.current_branch,
+        create_same_branch_name: payload.create_same_branch_name,
         target_repo_name: payload.target_repo_name,
         target_repo_path: normalize_repo_source(payload.target_repo_path)?,
         target_branch: payload.target_branch,
@@ -524,7 +577,7 @@ pub fn session_start(
         .to_string();
 
     ensure_repo_clean(&repo_path)?;
-    run_git(&repo_path, &["checkout", &session.current_branch])?;
+    prepare_current_branch(session)?;
     fetch_target_branch(session)?;
     run_until_conflict_or_complete(session)?;
     refresh_session_files(session)?;
@@ -579,7 +632,8 @@ pub fn session_continue(
     apply_conflict_resolutions(&repo_path, &session.conflict_files, &payload.resolutions)?;
     write_merge_message(&repo_path, &payload.commit_message)?;
 
-    let (success, _stdout, stderr) = run_git_with_status(&repo_path, &["cherry-pick", "--continue"])?;
+    let (success, _stdout, stderr) =
+        run_git_with_status(&repo_path, &["cherry-pick", "--continue"])?;
     if !success && !is_cherry_pick_in_progress(&repo_path)? {
         session.status = SessionStatus::Failed;
         session.last_error = Some(stderr.clone());
