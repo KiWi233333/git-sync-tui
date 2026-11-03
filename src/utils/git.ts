@@ -1,4 +1,4 @@
-import simpleGit, { type SimpleGit } from 'simple-git'
+import { simpleGit, type SimpleGit } from 'simple-git'
 import { existsSync, writeFileSync, unlinkSync, readFileSync } from 'fs'
 import { execSync } from 'child_process'
 import { join } from 'path'
